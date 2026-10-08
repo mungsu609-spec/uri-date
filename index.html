@@ -317,6 +317,7 @@ const CAFE_TAGS = [
   { key: "comfySeat", label: "🛋 편한 좌석" },
   { key: "photoSpot", label: "📸 사진 맛집" },
   { key: "smoking", label: "🚬 흡연 가능" },
+  { key: "parking", label: "🅿️ 주차 가능" },
 ];
 function tagsHtml(c) {
   const on = CAFE_TAGS.filter((t) => c[t.key]);
@@ -410,6 +411,18 @@ async function openAdd() {
   setTimeout(() => q.focus(), 50);
 }
 
+// 이미 저장한 카페인지 확인 (카카오 장소가 같거나, 이름이 같고 주소가 겹치면 같은 카페로 봐요)
+const norm = (t) => (t || "").toLowerCase().replace(/[\s·.,()\-]/g, "");
+function findDuplicate(cafe) {
+  const n = norm(cafe.name), a = norm(cafe.address);
+  return cafes.find((c) => {
+    if (cafe.kakaoId && c.kakaoId) return String(c.kakaoId) === String(cafe.kakaoId);
+    if (norm(c.name) !== n) return false;
+    const ca = norm(c.address);
+    return !a || !ca || ca.includes(a) || a.includes(ca);
+  });
+}
+
 function searchCafe(query) {
   const box = $("#qResults");
   if (!query) return;
@@ -422,7 +435,7 @@ function searchCafe(query) {
     box.innerHTML = data.map((p, i) => `
       <button class="result" data-i="${i}">
         <div class="result-main">
-          <div class="result-name">${esc(p.place_name)}</div>
+          <div class="result-name">${esc(p.place_name)}${findDuplicate({ name: p.place_name, address: p.road_address_name || p.address_name, kakaoId: p.id }) ? `<span class="good-badge">이미 저장됨</span>` : ""}</div>
           <div class="result-sub">${esc(p.road_address_name || p.address_name)} · ${esc(p.category_name.split(" > ").pop())}</div>
         </div>
       </button>`).join("");
@@ -430,8 +443,11 @@ function searchCafe(query) {
       const r = e.target.closest(".result");
       if (!r) return;
       const p = data[+r.dataset.i];
+      const cafe = { name: p.place_name, address: p.road_address_name || p.address_name, x: p.x, y: p.y, kakaoId: p.id };
+      const dup = findDuplicate(cafe);
+      if (dup) return toast(`'${dup.name}'은(는) 이미 저장한 카페예요`);
       box.innerHTML = "";
-      showForm({ name: p.place_name, address: p.road_address_name || p.address_name, x: p.x, y: p.y, kakaoId: p.id });
+      showForm(cafe);
     };
   });
 }
@@ -455,6 +471,10 @@ function showForm(cafe, editing = false) {
   $("#fSave").onclick = async () => {
     const name = cafe.x ? cafe.name : $("#fName").value.trim();
     if (!name) return toast("카페 이름을 적어 주세요");
+    if (!editing) {
+      const dup = findDuplicate({ name, address: cafe.x ? cafe.address : $("#fAddr").value.trim(), kakaoId: cafe.kakaoId });
+      if (dup) return toast(`'${dup.name}'은(는) 이미 저장한 카페예요`);
+    }
     const data = {
       name,
       address: cafe.x ? cafe.address : $("#fAddr").value.trim(),

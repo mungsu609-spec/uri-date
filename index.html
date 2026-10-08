@@ -79,6 +79,7 @@ header h1 { font-size: 22px; margin: 0; flex: 1; }
   padding: 4px 24px 4px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--card)
   url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23999' stroke-width='1.6'/%3E%3C/svg%3E") no-repeat right 9px center;
 }
+.link { color: var(--accent); font-size: inherit; text-decoration: underline; padding: 0; }
 .card-dist { color: var(--accent); font-size: 14px; font-weight: 700; white-space: nowrap; padding-top: 2px; }
 .chip { flex: none; padding: 7px 14px; border-radius: 999px; background: var(--card); border: 1px solid var(--line); font-size: 14px; }
 .chip.on { background: var(--text); color: var(--bg); border-color: var(--text); }
@@ -188,9 +189,10 @@ textarea { min-height: 70px; resize: vertical; }
       <option value="name">가나다순</option>
       <option value="added">추가순</option>
       <option value="dist">거리순</option>
+      <option value="near">내 위치순</option>
     </select>
   </div>
-  <div class="hint" id="distHint" style="display:none;margin:-4px 0 10px">📍 거리는 금강로 431(구서백리명가에덴)에서 잰 직선거리예요</div>
+  <div class="hint" id="distHint" style="display:none;margin:-4px 0 10px"></div>
   <div id="list"></div>
 </div>
 <button class="fab" id="btnAdd">＋ 카페 추가</button>
@@ -329,23 +331,28 @@ let ratings = {};       // 카카오 장소 id → { name, rating: "good" | "bad
 let nearRedraw = null;  // 근처 맛집 창이 열려 있으면 평가가 바뀔 때 다시 그림
 let filter = "all";
 
-// ---------- 정렬 (가나다순 / 추가순 / 거리순) ----------
+// ---------- 정렬 (가나다순 / 추가순 / 거리순 / 내 위치순) ----------
 // 거리순 기준: 부산 금정구 금강로 431 (구서백리명가에덴)
 const HOME = { name: "금강로 431", x: 129.088312623812, y: 35.2462173475132 };
 let sortBy = ls.get("dateapp.sort", "name");
-function distFromHome(c) {
-  if (!c.x || !c.y) return null;
+// 내 위치순 기준: 폰의 현재 위치. 이 폰 안에서 거리 계산에만 쓰고 어디에도 저장하지 않아요.
+let myPos = null;        // { x: 경도, y: 위도 }
+let locating = false;
+// 지금 정렬의 기준점 (거리를 안 쓰는 정렬이거나 아직 위치를 모르면 null)
+const distBase = () => (sortBy === "dist" ? HOME : sortBy === "near" ? myPos : null);
+function distFrom(c, base = distBase()) {
+  if (!base || !c.x || !c.y) return null;
   const R = 6371000, rad = (d) => (d * Math.PI) / 180;
-  const dLat = rad(c.y - HOME.y), dLng = rad(c.x - HOME.x);
-  const a = Math.sin(dLat / 2) ** 2 + Math.cos(rad(HOME.y)) * Math.cos(rad(+c.y)) * Math.sin(dLng / 2) ** 2;
+  const dLat = rad(c.y - base.y), dLng = rad(c.x - base.x);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(rad(base.y)) * Math.cos(rad(+c.y)) * Math.sin(dLng / 2) ** 2;
   return 2 * R * Math.asin(Math.sqrt(a));
 }
 const fmtDist = (m) => `${(m / 1000).toFixed(m < 10000 ? 1 : 0)}km`;
 function sortCafes(list) {
   const byName = (a, b) => (a.name || "").localeCompare(b.name || "", "ko");
   if (sortBy === "added") return [...list].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-  if (sortBy === "dist") return [...list].sort((a, b) => {
-    const da = distFromHome(a), db = distFromHome(b);
+  if (distBase()) return [...list].sort((a, b) => {
+    const da = distFrom(a), db = distFrom(b);
     if (da == null || db == null) return da == null && db == null ? byName(a, b) : da == null ? 1 : -1;  // 거리 모르는 곳은 맨 뒤
     return da - db;
   });
@@ -379,7 +386,7 @@ function render() {
     <div class="card ${c.visited ? "visited" : ""}" data-id="${esc(c.id)}">
       <div class="card-top">
         <div class="card-name">${esc(c.name)}</div>
-        ${sortBy === "dist" ? `<span class="card-dist">${distFromHome(c) == null ? "거리 모름" : "📍 " + fmtDist(distFromHome(c))}</span>` : ""}
+        ${distBase() ? `<span class="card-dist">${distFrom(c) == null ? "거리 모름" : "📍 " + fmtDist(distFrom(c))}</span>` : ""}
         ${c.visited ? `<span class="badge">가봤어요</span>` : ""}
       </div>
       ${c.address ? `<div class="card-addr">${esc(c.address)}</div>` : ""}
@@ -409,15 +416,44 @@ $("#list").addEventListener("click", (e) => {
 
 const markSort = () => {
   $("#sortSel").value = sortBy;
-  $("#distHint").style.display = sortBy === "dist" ? "" : "none";
+  const h = $("#distHint");
+  h.style.display = sortBy === "dist" || sortBy === "near" ? "" : "none";
+  if (sortBy === "dist") h.innerHTML = "📍 거리는 금강로 431(구서백리명가에덴)에서 잰 직선거리예요";
+  if (sortBy === "near") h.innerHTML = locating ? "📍 내 위치를 찾는 중…"
+    : myPos ? `📍 지금 내 위치에서 잰 직선거리예요 · <button class="link" id="relocate">위치 다시 찾기</button>` : "";
 };
+const setSort = (v) => { sortBy = v; ls.set("dateapp.sort", v); markSort(); render(); };
+
+// 폰의 현재 위치 찾기 → 성공하면 내 위치순으로 정렬, 실패하면 이전 정렬로 돌아가요
+// keepOld: 위치 다시 찾기처럼 이미 찾은 위치가 있으면, 실패해도 그 위치로 계속 보여 줘요
+function locate(fallback, keepOld = false) {
+  if (!navigator.geolocation) { toast("이 폰에서는 위치를 쓸 수 없어요"); return setSort(fallback); }
+  locating = true; markSort();
+  navigator.geolocation.getCurrentPosition(
+    (p) => { locating = false; myPos = { x: p.coords.longitude, y: p.coords.latitude }; if (sortBy === "near") { markSort(); render(); } },
+    (err) => {
+      locating = false;
+      toast(err.code === 1
+        ? "위치 사용이 꺼져 있어요. 설정 → 개인정보 보호 및 보안 → 위치 서비스 → Safari 웹 사이트를 '앱을 사용하는 동안'으로 바꿔 주세요"
+        : "위치를 찾지 못했어요. 잠시 뒤에 다시 해 주세요");
+      if (!keepOld) myPos = null;
+      if (sortBy === "near") setSort(myPos ? "near" : fallback === "near" ? "name" : fallback);
+    },
+    { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 });
+}
+
 markSort();
+if (sortBy === "near") locate("name");
+let prevSort = sortBy;
 $("#sortSel").addEventListener("change", (e) => {
-  sortBy = e.target.value;
-  ls.set("dateapp.sort", sortBy);
-  markSort();
-  render();
+  const v = e.target.value;
+  setSort(v);
+  if (v === "near") locate(prevSort === "near" ? "name" : prevSort);
+  prevSort = v;
 });
+$("#distHint").addEventListener("click", (e) => { if (e.target.id === "relocate") locate("name", true); });
+// 앱을 다시 열면 그사이 이동했을 수 있으니 위치를 새로 찾아요
+document.addEventListener("visibilitychange", () => { if (!document.hidden && sortBy === "near" && !locating) locate("name", true); });
 
 $("#filters").addEventListener("click", (e) => {
   const b = e.target.closest(".chip");

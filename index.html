@@ -117,6 +117,14 @@ textarea { min-height: 70px; resize: vertical; }
 .row input { flex: 1; }
 .full { width: 100%; padding: 14px; margin-top: 16px; border-radius: 14px; font-size: 16px; }
 .hint { font-size: 12px; color: var(--sub); margin-top: 4px; }
+.checks { display: flex; gap: 8px; flex-wrap: wrap; }
+.checks label.check {
+  display: flex; align-items: center; gap: 6px; margin: 0; padding: 9px 14px; border-radius: 12px;
+  background: var(--card); border: 1px solid var(--line); color: var(--text); font-size: 15px;
+}
+.checks input { width: 18px; height: 18px; margin: 0; accent-color: var(--accent); }
+.tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+.tag { font-size: 12px; padding: 3px 9px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
 
 .result { display: flex; align-items: center; gap: 10px; padding: 12px 14px; background: var(--card); border-radius: 14px; margin-bottom: 8px; text-align: left; width: 100%; }
 .result-main { flex: 1; min-width: 0; text-align: left; padding: 0; }
@@ -298,6 +306,16 @@ let ratings = {};       // 카카오 장소 id → { name, rating: "good" | "bad
 let nearRedraw = null;  // 근처 맛집 창이 열려 있으면 평가가 바뀔 때 다시 그림
 let filter = "all";
 
+// 카페 특징 체크박스 (여러 개 골라도 되고, 안 골라도 돼요)
+const CAFE_TAGS = [
+  { key: "comfySeat", label: "🛋 편한 좌석" },
+  { key: "photoSpot", label: "📸 사진 맛집" },
+];
+function tagsHtml(c) {
+  const on = CAFE_TAGS.filter((t) => c[t.key]);
+  return on.length ? `<div class="tags">${on.map((t) => `<span class="tag">${t.label}</span>`).join("")}</div>` : "";
+}
+
 function render() {
   const list = $("#list");
   const shown = cafes.filter((c) => filter === "all" || (filter === "done" ? c.visited : !c.visited));
@@ -316,6 +334,7 @@ function render() {
         ${c.visited ? `<span class="badge">가봤어요</span>` : ""}
       </div>
       ${c.address ? `<div class="card-addr">${esc(c.address)}</div>` : ""}
+      ${tagsHtml(c)}
       ${c.memo ? `<div class="card-memo">${esc(c.memo)}</div>` : ""}
       ${c.addedBy ? `<div class="card-by">${esc(c.addedBy)} 님이 추가</div>` : ""}
       <div class="actions">
@@ -418,6 +437,10 @@ function showForm(cafe, editing = false) {
     <label>네이버지도 링크 (선택)</label>
     <input type="url" id="fNaver" value="${esc(cafe.naverUrl)}" placeholder="https://naver.me/...">
     <div class="hint">네이버지도에서 카페 → 공유 → 링크 복사 후 붙여 넣으면, 누를 때 그 카페가 바로 열려요.</div>
+    <label>특징 (선택, 여러 개 골라도 돼요)</label>
+    <div class="checks">${CAFE_TAGS.map((t) => `
+      <label class="check"><input type="checkbox" id="f_${t.key}" ${cafe[t.key] ? "checked" : ""}>${t.label}</label>`).join("")}
+    </div>
     <label>메모 (선택)</label>
     <textarea id="fMemo" placeholder="예: 딸기 케이크 맛집, 주말엔 웨이팅 있음">${esc(cafe.memo)}</textarea>
     <button class="btn main full" id="fSave">${editing ? "수정 저장" : "저장"}</button>
@@ -430,6 +453,7 @@ function showForm(cafe, editing = false) {
       address: cafe.x ? cafe.address : $("#fAddr").value.trim(),
       naverUrl: $("#fNaver").value.trim(),
       memo: $("#fMemo").value.trim(),
+      ...Object.fromEntries(CAFE_TAGS.map((t) => [t.key, $("#f_" + t.key).checked])),
     };
     try {
       if (editing) await store.update(cafe.id, data);
@@ -580,6 +604,7 @@ function pickCafe(onlyNew) {
       <div class="name">${esc(c.name)}</div>
       ${c.visited ? `<div style="margin-top:6px"><span class="badge">가봤어요</span></div>` : ""}
       ${c.address ? `<div class="card-addr">${esc(c.address)}</div>` : ""}
+      ${tagsHtml(c).replace('class="tags"', 'class="tags" style="justify-content:center"')}
       ${c.memo ? `<div class="card-memo">${esc(c.memo)}</div>` : ""}
     </div>
     <button class="btn main full" id="pNear">🍽 근처 맛집 보기</button>

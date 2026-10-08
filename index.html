@@ -60,7 +60,9 @@ header h1 { font-size: 22px; margin: 0; flex: 1; }
 .banner { background: var(--accent-soft); border-radius: 14px; padding: 10px 14px; font-size: 14px; margin-bottom: 12px; }
 .banner b { color: var(--accent); }
 
-.picks { display: flex; gap: 8px; margin-bottom: 14px; }
+.picks { display: flex; gap: 8px; margin-bottom: 8px; }
+.pick-filters { margin-bottom: 14px; }
+.pick-filters .hint { margin: 0 0 6px; }
 .pick {
   flex: 1; padding: 14px 8px; border-radius: 18px;
   background: var(--accent); color: #fff; font-size: 16px; font-weight: 700; box-shadow: var(--shadow); word-break: keep-all;
@@ -162,6 +164,10 @@ textarea { min-height: 70px; resize: vertical; }
   <div class="picks">
     <button class="pick" id="btnPickAll">🎲 전체에서 뽑기<small>가본 곳도 포함</small></button>
     <button class="pick alt" id="btnPickNew">✨ 새로운 곳만<small>안 가본 곳에서</small></button>
+  </div>
+  <div class="pick-filters">
+    <div class="hint">체크하면 그 특징이 있는 카페에서만 뽑아요</div>
+    <div class="checks" id="pickTags"></div>
   </div>
   <div class="chips" id="filters">
     <button class="chip on" data-f="all">전체</button>
@@ -588,10 +594,19 @@ async function openNearby(cafe) {
 // ---------- 오늘 어디 갈까? ----------
 // onlyNew: true면 안 가본 곳만, false면 가본 곳까지 전체에서
 let lastPickId = null;
+// 뽑기 조건 체크박스 (체크한 특징을 모두 가진 카페에서만 뽑아요)
+$("#pickTags").innerHTML = CAFE_TAGS.map((t) => `
+  <label class="check"><input type="checkbox" data-tag="${t.key}">${t.label}</label>`).join("");
+const pickTagsOn = () => CAFE_TAGS.filter((t) => $(`#pickTags [data-tag="${t.key}"]`).checked);
+
 function pickCafe(onlyNew) {
   if (!cafes.length) return toast("먼저 카페를 추가해 주세요");
-  const pool = onlyNew ? cafes.filter((c) => !c.visited) : cafes;
-  if (!pool.length) return toast("안 가본 카페가 없어요. 새 카페를 추가하거나 전체에서 뽑아 보세요");
+  const want = pickTagsOn();
+  const pool = cafes.filter((c) => (!onlyNew || !c.visited) && want.every((t) => c[t.key]));
+  if (!pool.length) {
+    if (want.length) return toast(`${onlyNew ? "안 가본 곳 중에 " : ""}${want.map((t) => t.label).join(" + ")} 카페가 없어요`);
+    return toast("안 가본 카페가 없어요. 새 카페를 추가하거나 전체에서 뽑아 보세요");
+  }
   // 다시 뽑기를 눌렀을 때 방금 나온 곳은 (다른 곳이 있으면) 빼기
   const from = pool.length > 1 ? pool.filter((c) => c.id !== lastPickId) : pool;
   const c = from[Math.floor(Math.random() * from.length)];
@@ -600,7 +615,8 @@ function pickCafe(onlyNew) {
     <h2><span></span><button class="close">✕</button></h2>
     <div class="big-pick">
       <div class="emoji">☕</div>
-      <div class="hint">${onlyNew ? "✨ 새로운 곳 중에서" : "🎲 전체에서"} · 오늘은 여기 어때요?</div>
+      <div class="hint">${onlyNew ? "✨ 새로운 곳 중에서" : "🎲 전체에서"}${want.length ? " · " + want.map((t) => t.label).join(" + ") : ""}</div>
+      <div class="hint">오늘은 여기 어때요?</div>
       <div class="name">${esc(c.name)}</div>
       ${c.visited ? `<div style="margin-top:6px"><span class="badge">가봤어요</span></div>` : ""}
       ${c.address ? `<div class="card-addr">${esc(c.address)}</div>` : ""}

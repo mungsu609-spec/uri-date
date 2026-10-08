@@ -71,6 +71,9 @@ header h1 { font-size: 22px; margin: 0; flex: 1; }
 .pick.alt { background: var(--card); color: var(--accent); }
 .chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 10px; scrollbar-width: none; }
 .chips::-webkit-scrollbar { display: none; }
+.sortbar { display: flex; align-items: center; gap: 6px; margin: -2px 0 10px; font-size: 13px; color: var(--sub); }
+.sortbar .chip { padding: 5px 11px; font-size: 13px; }
+.card-dist { color: var(--accent); font-size: 13px; font-weight: 600; margin-top: 2px; }
 .chip { flex: none; padding: 7px 14px; border-radius: 999px; background: var(--card); border: 1px solid var(--line); font-size: 14px; }
 .chip.on { background: var(--text); color: var(--bg); border-color: var(--text); }
 
@@ -173,6 +176,12 @@ textarea { min-height: 70px; resize: vertical; }
     <button class="chip on" data-f="all">전체</button>
     <button class="chip" data-f="todo">안 가본 곳</button>
     <button class="chip" data-f="done">가본 곳</button>
+  </div>
+  <div class="sortbar" id="sorts">
+    <span>정렬</span>
+    <button class="chip" data-s="name">가나다순</button>
+    <button class="chip" data-s="added">추가순</button>
+    <button class="chip" data-s="dist">거리순</button>
   </div>
   <div id="list"></div>
 </div>
@@ -312,6 +321,29 @@ let ratings = {};       // 카카오 장소 id → { name, rating: "good" | "bad
 let nearRedraw = null;  // 근처 맛집 창이 열려 있으면 평가가 바뀔 때 다시 그림
 let filter = "all";
 
+// ---------- 정렬 (가나다순 / 추가순 / 거리순) ----------
+// 거리순 기준: 부산 금정구 금강로 431 (구서백리명가에덴)
+const HOME = { name: "금강로 431", x: 129.088312623812, y: 35.2462173475132 };
+let sortBy = ls.get("dateapp.sort", "name");
+function distFromHome(c) {
+  if (!c.x || !c.y) return null;
+  const R = 6371000, rad = (d) => (d * Math.PI) / 180;
+  const dLat = rad(c.y - HOME.y), dLng = rad(c.x - HOME.x);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(rad(HOME.y)) * Math.cos(rad(+c.y)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+const fmtDist = (m) => (m < 1000 ? `${Math.round(m)}m` : `${(m / 1000).toFixed(m < 10000 ? 1 : 0)}km`);
+function sortCafes(list) {
+  const byName = (a, b) => (a.name || "").localeCompare(b.name || "", "ko");
+  if (sortBy === "added") return [...list].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  if (sortBy === "dist") return [...list].sort((a, b) => {
+    const da = distFromHome(a), db = distFromHome(b);
+    if (da == null || db == null) return da == null && db == null ? byName(a, b) : da == null ? 1 : -1;  // 거리 모르는 곳은 맨 뒤
+    return da - db;
+  });
+  return [...list].sort(byName);
+}
+
 // 카페 특징 체크박스 (여러 개 골라도 되고, 안 골라도 돼요)
 const CAFE_TAGS = [
   { key: "comfySeat", label: "🛋 편한 좌석" },
@@ -326,7 +358,7 @@ function tagsHtml(c) {
 
 function render() {
   const list = $("#list");
-  const shown = cafes.filter((c) => filter === "all" || (filter === "done" ? c.visited : !c.visited));
+  const shown = sortCafes(cafes.filter((c) => filter === "all" || (filter === "done" ? c.visited : !c.visited)));
   if (!cafes.length) {
     list.innerHTML = `<div class="empty">아직 저장한 카페가 없어요.<br>아래 <b>＋ 카페 추가</b>를 눌러 보세요.</div>`;
     return;
@@ -342,6 +374,7 @@ function render() {
         ${c.visited ? `<span class="badge">가봤어요</span>` : ""}
       </div>
       ${c.address ? `<div class="card-addr">${esc(c.address)}</div>` : ""}
+      ${sortBy === "dist" ? `<div class="card-dist">📍 ${distFromHome(c) == null ? "거리 정보 없음 (직접 입력한 카페)" : `${HOME.name}에서 ${fmtDist(distFromHome(c))}`}</div>` : ""}
       ${tagsHtml(c)}
       ${c.memo ? `<div class="card-memo">${esc(c.memo)}</div>` : ""}
       ${c.addedBy ? `<div class="card-by">${esc(c.addedBy)} 님이 추가</div>` : ""}
@@ -364,6 +397,17 @@ $("#list").addEventListener("click", (e) => {
   if (act === "naver") openNaver(cafe.name + " " + regionOf(cafe.address), cafe.naverUrl);
   if (act === "visit") store.update(cafe.id, { visited: !cafe.visited });
   if (act === "edit") openEdit(cafe);
+});
+
+const markSort = () => document.querySelectorAll("#sorts .chip").forEach((x) => x.classList.toggle("on", x.dataset.s === sortBy));
+markSort();
+$("#sorts").addEventListener("click", (e) => {
+  const b = e.target.closest(".chip");
+  if (!b) return;
+  sortBy = b.dataset.s;
+  ls.set("dateapp.sort", sortBy);
+  markSort();
+  render();
 });
 
 $("#filters").addEventListener("click", (e) => {

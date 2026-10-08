@@ -1,0 +1,674 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>우리 데이트</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="우리 데이트">
+<meta name="theme-color" content="#fff7f3">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-180.png">
+<link rel="manifest" href="manifest.webmanifest">
+<style>
+:root {
+  --bg: #fff7f3;
+  --card: #ffffff;
+  --text: #3a2a2a;
+  --sub: #8a7470;
+  --line: #f0e2dc;
+  --accent: #e8677d;
+  --accent-soft: #fde4e8;
+  --done: #7aa889;
+  --done-soft: #e3f1e7;
+  --shadow: 0 2px 10px rgba(120, 60, 50, .08);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1d1717;
+    --card: #2a2222;
+    --text: #f3e8e6;
+    --sub: #b29e9a;
+    --line: #3d3232;
+    --accent: #f08a9b;
+    --accent-soft: #4a2a31;
+    --done: #8fc19e;
+    --done-soft: #2a3a2f;
+    --shadow: none;
+  }
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  font-size: 16px;
+  line-height: 1.45;
+  padding: env(safe-area-inset-top) 0 calc(env(safe-area-inset-bottom) + 90px);
+}
+button, input, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; border: 0; background: none; }
+.wrap { max-width: 560px; margin: 0 auto; padding: 0 16px; }
+
+header { padding: 18px 0 10px; display: flex; align-items: center; gap: 10px; }
+header h1 { font-size: 22px; margin: 0; flex: 1; }
+.icon-btn { width: 40px; height: 40px; border-radius: 12px; background: var(--card); box-shadow: var(--shadow); font-size: 18px; }
+
+.banner { background: var(--accent-soft); border-radius: 14px; padding: 10px 14px; font-size: 14px; margin-bottom: 12px; }
+.banner b { color: var(--accent); }
+
+.pick {
+  width: 100%; padding: 16px; border-radius: 18px; margin-bottom: 14px;
+  background: var(--accent); color: #fff; font-size: 17px; font-weight: 700; box-shadow: var(--shadow);
+}
+.chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 10px; scrollbar-width: none; }
+.chips::-webkit-scrollbar { display: none; }
+.chip { flex: none; padding: 7px 14px; border-radius: 999px; background: var(--card); border: 1px solid var(--line); font-size: 14px; }
+.chip.on { background: var(--text); color: var(--bg); border-color: var(--text); }
+
+.card { background: var(--card); border-radius: 18px; padding: 14px 16px; margin-bottom: 10px; box-shadow: var(--shadow); }
+.card.visited { opacity: .75; }
+.card-top { display: flex; align-items: flex-start; gap: 10px; }
+.card-name { font-weight: 700; font-size: 17px; flex: 1; word-break: keep-all; }
+.badge { font-size: 12px; padding: 3px 9px; border-radius: 999px; background: var(--done-soft); color: var(--done); white-space: nowrap; }
+.card-addr { color: var(--sub); font-size: 13px; margin-top: 2px; }
+.card-memo { font-size: 14px; margin-top: 6px; white-space: pre-wrap; }
+.card-by { color: var(--sub); font-size: 12px; margin-top: 6px; }
+.actions { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+.btn { padding: 8px 12px; border-radius: 12px; background: var(--bg); border: 1px solid var(--line); font-size: 14px; }
+.btn.main { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.btn.naver { background: #03c75a; border-color: #03c75a; color: #fff; font-weight: 600; }
+
+.empty { text-align: center; color: var(--sub); padding: 40px 10px; }
+
+.fab {
+  position: fixed; right: max(16px, calc(50% - 264px)); bottom: calc(env(safe-area-inset-bottom) + 20px);
+  height: 56px; padding: 0 22px; border-radius: 28px; background: var(--text); color: var(--bg);
+  font-weight: 700; font-size: 16px; box-shadow: 0 4px 16px rgba(0,0,0,.2);
+}
+
+/* 아래에서 올라오는 창 */
+.sheet-bg { position: fixed; inset: 0; background: rgba(0,0,0,.35); display: none; z-index: 10; }
+.sheet-bg.open { display: block; }
+.sheet {
+  position: absolute; left: 0; right: 0; bottom: 0; max-height: 88vh; overflow-y: auto;
+  background: var(--bg); border-radius: 22px 22px 0 0; padding: 8px 0 calc(env(safe-area-inset-bottom) + 20px);
+}
+.sheet .wrap { padding-top: 6px; }
+.grab { width: 40px; height: 5px; border-radius: 3px; background: var(--line); margin: 4px auto 10px; }
+.sheet h2 { font-size: 19px; margin: 4px 0 12px; display: flex; align-items: center; gap: 8px; }
+.sheet h2 span { flex: 1; }
+.close { font-size: 22px; color: var(--sub); padding: 0 4px; }
+
+label { display: block; font-size: 13px; color: var(--sub); margin: 12px 0 4px; }
+input[type=text], input[type=url], textarea {
+  width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: var(--card);
+  font-size: 16px; outline: none;
+}
+input:focus, textarea:focus { border-color: var(--accent); }
+textarea { min-height: 70px; resize: vertical; }
+.row { display: flex; gap: 8px; }
+.row input { flex: 1; }
+.full { width: 100%; padding: 14px; margin-top: 16px; border-radius: 14px; font-size: 16px; }
+.hint { font-size: 12px; color: var(--sub); margin-top: 4px; }
+
+.result { display: flex; align-items: center; gap: 10px; padding: 12px 14px; background: var(--card); border-radius: 14px; margin-bottom: 8px; text-align: left; width: 100%; }
+.result-main { flex: 1; min-width: 0; text-align: left; padding: 0; }
+.rate { width: 38px; height: 38px; border-radius: 12px; background: var(--bg); border: 1px solid var(--line); font-size: 17px; flex: none; }
+.rate.on { background: var(--accent-soft); border-color: var(--accent); }
+.good-badge { font-size: 11px; color: var(--accent); font-weight: 700; margin-left: 4px; }
+.rated { display: flex; align-items: center; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+.rated span { flex: 1; min-width: 0; }
+.result-name { font-weight: 600; }
+.result-sub { font-size: 12px; color: var(--sub); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dist { font-size: 13px; color: var(--accent); font-weight: 600; white-space: nowrap; }
+.picked { background: var(--accent-soft); border-radius: 14px; padding: 12px 14px; }
+.msg { text-align: center; color: var(--sub); padding: 20px 0; font-size: 14px; }
+
+.big-pick { text-align: center; padding: 10px 0 4px; }
+.big-pick .emoji { font-size: 44px; }
+.big-pick .name { font-size: 24px; font-weight: 800; margin-top: 6px; word-break: keep-all; }
+.code { font-family: ui-monospace, Menlo, monospace; font-size: 18px; letter-spacing: 1px; background: var(--card); padding: 12px; border-radius: 12px; text-align: center; user-select: all; }
+.toast {
+  position: fixed; left: 0; right: 0; margin: 0 auto; width: fit-content; max-width: calc(100% - 32px);
+  bottom: calc(env(safe-area-inset-bottom) + 90px); text-align: center;
+  background: var(--text); color: var(--bg); padding: 10px 18px; border-radius: 18px; font-size: 14px;
+  opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 20;
+}
+.toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>☕ 우리 데이트</h1>
+    <button class="icon-btn" id="btnSettings" aria-label="설정">⚙️</button>
+  </header>
+  <div id="banner"></div>
+  <button class="pick" id="btnPick">🎲 오늘 어디 갈까?</button>
+  <div class="chips" id="filters">
+    <button class="chip on" data-f="all">전체</button>
+    <button class="chip" data-f="todo">안 가본 곳</button>
+    <button class="chip" data-f="done">가본 곳</button>
+  </div>
+  <div id="list"></div>
+</div>
+<button class="fab" id="btnAdd">＋ 카페 추가</button>
+
+<div class="sheet-bg" id="sheetBg"><div class="sheet" id="sheet"></div></div>
+<div class="toast" id="toast"></div>
+
+<script src="config.js"></script>
+<script type="module">
+const CFG = window.APP_CONFIG || {};
+const $ = (s, el = document) => el.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+// ---------- 작은 저장 도우미 (브라우저 저장소가 막혀도 앱은 돌아가게) ----------
+const ls = {
+  get(k, d = null) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+  del(k) { try { localStorage.removeItem(k); } catch {} },
+};
+
+function toast(text) {
+  const t = $("#toast");
+  t.textContent = text;
+  t.classList.add("show");
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => t.classList.remove("show"), 1800);
+}
+
+// ---------- 커플 코드 / 내 이름 ----------
+const params = new URLSearchParams(location.search);
+if (params.get("room")) ls.set("dateapp.room", params.get("room"));
+let room = ls.get("dateapp.room");
+let me = ls.get("dateapp.me", "");
+
+function newRoomCode() {
+  const chars = "abcdefghjkmnpqrstuvwxyz23456789";
+  const a = new Uint32Array(12);
+  crypto.getRandomValues(a);
+  return "date-" + Array.from(a, (n) => chars[n % chars.length]).join("");
+}
+
+// ---------- 저장소: Firebase(둘이 같이) 또는 이 기기만 ----------
+const useFirebase = !!(CFG.FIREBASE && CFG.FIREBASE.projectId);
+let store = null;
+
+function localStore(name) {
+  const KEY = "dateapp." + name;
+  let subs = [];
+  const all = () => ls.get(KEY, []);
+  const save = (list) => { ls.set(KEY, list); subs.forEach((cb) => cb(list)); };
+  return {
+    subscribe(cb) { subs.push(cb); cb(all()); },
+    async add(cafe) { save([{ ...cafe, id: Date.now().toString(36) + Math.random().toString(36).slice(2, 8), createdAt: Date.now() }, ...all()]); },
+    async update(id, patch) { save(all().map((c) => (c.id === id ? { ...c, ...patch } : c))); },
+    async set(id, data) { save([{ ...data, id, createdAt: Date.now() }, ...all().filter((c) => c.id !== id)]); },
+    async remove(id) { save(all().filter((c) => c.id !== id)); },
+  };
+}
+
+let fb = null;
+async function firebaseStore(roomCode, name) {
+  const V = "10.12.2";
+  if (!fb) {
+    const { initializeApp } = await import(`https://www.gstatic.com/firebasejs/${V}/firebase-app.js`);
+    const fs = await import(`https://www.gstatic.com/firebasejs/${V}/firebase-firestore.js`);
+    fb = { fs, db: fs.getFirestore(initializeApp(CFG.FIREBASE)) };
+  }
+  const { fs, db } = fb;
+  const col = fs.collection(db, "rooms", roomCode, name);
+  return {
+    subscribe(cb) {
+      fs.onSnapshot(fs.query(col, fs.orderBy("createdAt", "desc")),
+        (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+        (err) => { console.error(err); toast("리스트를 불러오지 못했어요"); });
+    },
+    add: (cafe) => fs.addDoc(col, { ...cafe, createdAt: Date.now() }),
+    update: (id, patch) => fs.updateDoc(fs.doc(col, id), patch),
+    set: (id, data) => fs.setDoc(fs.doc(col, id), { ...data, createdAt: Date.now() }),
+    remove: (id) => fs.deleteDoc(fs.doc(col, id)),
+  };
+}
+
+// ---------- 맛집 추천에서 빼는 식당 (해산물, 내장류, 날 것) ----------
+// 카카오 분류 중 하나라도 이 이름이면 제외 (예: "음식점 > 한식 > 해물,생선 > 회")
+const EXCLUDE_CATEGORIES = [
+  "해물,생선", "회", "참치회", "초밥,롤", "해산물뷔페", "조개", "게,대게", "굴,전복", "장어", "복어", "아구",
+  "매운탕,해물탕", "오징어", "낙지", "주꾸미", "새우", "꼬막", "곱창,막창", "육회",
+];
+// 가게 이름에 이 글자가 들어 있어도 제외 (분류가 "한식"으로만 되어 있는 가게 대비)
+const EXCLUDE_NAME_WORDS = [
+  "횟집", "횟", "회센터", "회타운", "물회", "회덮밥", "수산", "해물", "해산물", "생선", "초밥", "스시", "사시미", "참치", "연어",
+  "조개", "대게", "킹크랩", "랍스터", "장어", "아구", "아귀", "복어", "매운탕", "굴국밥", "전복", "낙지", "쭈꾸미", "주꾸미",
+  "문어", "꼬막", "새우", "게장", "육회", "육사시미", "뭉티기",
+  "곱창", "막창", "대창", "양곱", "선지", "내장", "염통", "오소리",
+];
+// 밥집이 아닌 곳 (카카오 분류 두 번째 칸 기준) — 조용히 빼고 개수도 세지 않음
+const NOT_MEAL = ["술집", "간식"];
+const isMeal = (p) => !NOT_MEAL.includes((p.category_name.split(" > ")[1] || "").trim());
+
+function isExcluded(p) {
+  const parts = p.category_name.split(" > ").map((s) => s.trim());
+  return parts.some((s) => EXCLUDE_CATEGORIES.includes(s)) || EXCLUDE_NAME_WORDS.some((w) => p.place_name.includes(w));
+}
+
+// ---------- 카카오 장소 검색 ----------
+let places = null;
+const kakaoReady = new Promise((resolve) => {
+  if (!CFG.KAKAO_JS_KEY) return resolve(false);
+  const s = document.createElement("script");
+  s.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${encodeURIComponent(CFG.KAKAO_JS_KEY)}&libraries=services&autoload=false`;
+  s.onload = () => kakao.maps.load(() => { places = new kakao.maps.services.Places(); resolve(true); });
+  s.onerror = () => resolve(false);
+  document.head.appendChild(s);
+});
+
+// ---------- 네이버지도 열기 ----------
+function regionOf(addr) {
+  return String(addr || "").split(" ").slice(0, 2).join(" ");
+}
+function openNaver(query, directUrl) {
+  if (directUrl) { location.href = directUrl; return; }
+  const web = "https://map.naver.com/p/search/" + encodeURIComponent(query);
+  const mobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  if (!mobile) { window.open(web, "_blank"); return; }
+  // 폰이면 네이버지도 앱으로 열고, 앱이 없으면 웹으로
+  const app = "nmap://search?query=" + encodeURIComponent(query) + "&appname=" + encodeURIComponent(location.hostname || "dateapp");
+  const started = Date.now();
+  location.href = app;
+  setTimeout(() => { if (!document.hidden && Date.now() - started < 2500) location.href = web; }, 1500);
+}
+
+// ---------- 목록 그리기 ----------
+let cafes = [];
+let rstore = null;      // 맛집 평가 저장소
+let ratings = {};       // 카카오 장소 id → { name, rating: "good" | "bad", by }
+let nearRedraw = null;  // 근처 맛집 창이 열려 있으면 평가가 바뀔 때 다시 그림
+let filter = "all";
+
+function render() {
+  const list = $("#list");
+  const shown = cafes.filter((c) => filter === "all" || (filter === "done" ? c.visited : !c.visited));
+  if (!cafes.length) {
+    list.innerHTML = `<div class="empty">아직 저장한 카페가 없어요.<br>아래 <b>＋ 카페 추가</b>를 눌러 보세요.</div>`;
+    return;
+  }
+  if (!shown.length) {
+    list.innerHTML = `<div class="empty">${filter === "done" ? "아직 가 본 곳이 없어요." : "모두 가 봤어요! 새 카페를 추가해 보세요."}</div>`;
+    return;
+  }
+  list.innerHTML = shown.map((c) => `
+    <div class="card ${c.visited ? "visited" : ""}" data-id="${esc(c.id)}">
+      <div class="card-top">
+        <div class="card-name">${esc(c.name)}</div>
+        ${c.visited ? `<span class="badge">가봤어요</span>` : ""}
+      </div>
+      ${c.address ? `<div class="card-addr">${esc(c.address)}</div>` : ""}
+      ${c.memo ? `<div class="card-memo">${esc(c.memo)}</div>` : ""}
+      ${c.addedBy ? `<div class="card-by">${esc(c.addedBy)} 님이 추가</div>` : ""}
+      <div class="actions">
+        <button class="btn main" data-act="near">🍽 근처 맛집</button>
+        <button class="btn naver" data-act="naver">N 지도</button>
+        <button class="btn" data-act="visit">${c.visited ? "↩ 안 가봤어요" : "✓ 가봤어요"}</button>
+        <button class="btn" data-act="edit">수정</button>
+      </div>
+    </div>`).join("");
+}
+
+$("#list").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-act]");
+  if (!b) return;
+  const cafe = cafes.find((c) => c.id === b.closest(".card").dataset.id);
+  if (!cafe) return;
+  const act = b.dataset.act;
+  if (act === "near") openNearby(cafe);
+  if (act === "naver") openNaver(cafe.name + " " + regionOf(cafe.address), cafe.naverUrl);
+  if (act === "visit") store.update(cafe.id, { visited: !cafe.visited });
+  if (act === "edit") openEdit(cafe);
+});
+
+$("#filters").addEventListener("click", (e) => {
+  const b = e.target.closest(".chip");
+  if (!b) return;
+  filter = b.dataset.f;
+  document.querySelectorAll("#filters .chip").forEach((x) => x.classList.toggle("on", x === b));
+  render();
+});
+
+// ---------- 아래에서 올라오는 창 ----------
+function openSheet(html) {
+  $("#sheet").innerHTML = `<div class="grab"></div><div class="wrap">${html}</div>`;
+  $("#sheetBg").classList.add("open");
+  $("#sheet").scrollTop = 0;
+}
+function closeSheet() { $("#sheetBg").classList.remove("open"); }
+$("#sheetBg").addEventListener("click", (e) => {
+  if (e.target.id === "sheetBg" || e.target.closest(".close")) closeSheet();
+});
+
+// ---------- 카페 추가 ----------
+$("#btnAdd").addEventListener("click", openAdd);
+
+async function openAdd() {
+  const hasKakao = await kakaoReady;
+  openSheet(`
+    <h2><span>카페 추가</span><button class="close">✕</button></h2>
+    ${hasKakao ? `
+      <div class="row">
+        <input type="text" id="q" placeholder="카페 이름 (예: 연남동 OO카페)" enterkeyhint="search">
+        <button class="btn main" id="qGo">검색</button>
+      </div>
+      <div class="hint">이름 뒤에 동네를 붙이면 더 잘 찾아요.</div>
+      <div id="qResults" style="margin-top:12px"></div>
+      <button class="btn" id="manual" style="margin-top:6px">검색에 없으면 직접 입력</button>
+    ` : `<div class="banner">카카오 키가 아직 없어서 <b>직접 입력</b>으로 추가해요.</div>`}
+    <div id="form"></div>`);
+  if (!hasKakao) return showForm({});
+  const q = $("#q");
+  const go = () => searchCafe(q.value.trim());
+  $("#qGo").onclick = go;
+  q.addEventListener("keydown", (e) => { if (e.key === "Enter") go(); });
+  $("#manual").onclick = () => { $("#qResults").innerHTML = ""; showForm({ name: q.value.trim() }); };
+  setTimeout(() => q.focus(), 50);
+}
+
+function searchCafe(query) {
+  const box = $("#qResults");
+  if (!query) return;
+  box.innerHTML = `<div class="msg">찾는 중…</div>`;
+  places.keywordSearch(query, (data, status) => {
+    if (status !== kakao.maps.services.Status.OK) {
+      box.innerHTML = `<div class="msg">검색 결과가 없어요. 이름을 바꿔 보거나 직접 입력해 주세요.</div>`;
+      return;
+    }
+    box.innerHTML = data.map((p, i) => `
+      <button class="result" data-i="${i}">
+        <div class="result-main">
+          <div class="result-name">${esc(p.place_name)}</div>
+          <div class="result-sub">${esc(p.road_address_name || p.address_name)} · ${esc(p.category_name.split(" > ").pop())}</div>
+        </div>
+      </button>`).join("");
+    box.onclick = (e) => {
+      const r = e.target.closest(".result");
+      if (!r) return;
+      const p = data[+r.dataset.i];
+      box.innerHTML = "";
+      showForm({ name: p.place_name, address: p.road_address_name || p.address_name, x: p.x, y: p.y, kakaoId: p.id });
+    };
+  });
+}
+
+function showForm(cafe, editing = false) {
+  $("#form").innerHTML = `
+    ${cafe.x ? `<div class="picked" style="margin-top:12px"><b>${esc(cafe.name)}</b><div class="result-sub">${esc(cafe.address)}</div></div>` : `
+      <label>카페 이름</label><input type="text" id="fName" value="${esc(cafe.name)}">
+      <label>주소 또는 동네 (선택)</label><input type="text" id="fAddr" value="${esc(cafe.address)}" placeholder="예: 서울 마포구 연남동">`}
+    <label>네이버지도 링크 (선택)</label>
+    <input type="url" id="fNaver" value="${esc(cafe.naverUrl)}" placeholder="https://naver.me/...">
+    <div class="hint">네이버지도에서 카페 → 공유 → 링크 복사 후 붙여 넣으면, 누를 때 그 카페가 바로 열려요.</div>
+    <label>메모 (선택)</label>
+    <textarea id="fMemo" placeholder="예: 딸기 케이크 맛집, 주말엔 웨이팅 있음">${esc(cafe.memo)}</textarea>
+    <button class="btn main full" id="fSave">${editing ? "수정 저장" : "저장"}</button>
+    ${editing ? `<button class="btn full" id="fDel" style="color:#d04848">삭제</button>` : ""}`;
+  $("#fSave").onclick = async () => {
+    const name = cafe.x ? cafe.name : $("#fName").value.trim();
+    if (!name) return toast("카페 이름을 적어 주세요");
+    const data = {
+      name,
+      address: cafe.x ? cafe.address : $("#fAddr").value.trim(),
+      naverUrl: $("#fNaver").value.trim(),
+      memo: $("#fMemo").value.trim(),
+    };
+    try {
+      if (editing) await store.update(cafe.id, data);
+      else await store.add({ ...data, x: cafe.x || null, y: cafe.y || null, kakaoId: cafe.kakaoId || null, visited: false, addedBy: me || "" });
+      closeSheet();
+      toast(editing ? "수정했어요" : "저장했어요");
+    } catch (err) { console.error(err); toast("저장하지 못했어요"); }
+  };
+  if (editing) $("#fDel").onclick = async () => {
+    if (!confirm(`'${cafe.name}'을(를) 지울까요?`)) return;
+    await store.remove(cafe.id);
+    closeSheet();
+    toast("지웠어요");
+  };
+}
+
+function openEdit(cafe) {
+  openSheet(`<h2><span>카페 수정</span><button class="close">✕</button></h2><div id="form"></div>`);
+  showForm(cafe, true);
+}
+
+// ---------- 근처 맛집 ----------
+async function openNearby(cafe) {
+  const region = regionOf(cafe.address);
+  const naverNear = () => openNaver(`${cafe.name} 근처 맛집`);
+  const hasKakao = await kakaoReady;
+  openSheet(`
+    <h2><span>🍽 ${esc(cafe.name)} 근처 맛집</span><button class="close">✕</button></h2>
+    <div id="nearBody"></div>`);
+  const body = $("#nearBody");
+  if (!hasKakao || !cafe.x) {
+    body.innerHTML = `
+      <div class="banner">${!hasKakao ? "카카오 키가 아직 없어서" : "직접 입력한 카페라 위치를 몰라서"} 근처 맛집 목록을 만들 수 없어요. 대신 네이버지도에서 찾아볼게요.</div>
+      <button class="btn naver full" id="nv">네이버지도에서 근처 맛집 보기</button>`;
+    $("#nv").onclick = naverNear;
+    return;
+  }
+  body.innerHTML = `
+    <div class="chips" id="radius">
+      <button class="chip" data-r="300">300m</button>
+      <button class="chip on" data-r="500">500m</button>
+      <button class="chip" data-r="1000">1km</button>
+    </div>
+    <div class="chips" id="kinds"></div>
+    <div id="nearList"></div>
+    <button class="btn full" id="nv">네이버지도에서 더 찾아보기</button>`;
+  $("#nv").onclick = naverNear;
+
+  let radius = 500, kind = "전체", items = [], pager = null, skipped = 0;
+  const center = new kakao.maps.LatLng(cafe.y, cafe.x);
+
+  const draw = () => {
+    const kinds = ["전체", ...new Set(items.map((p) => p.kind))];
+    $("#kinds").innerHTML = kinds.map((k) => `<button class="chip ${k === kind ? "on" : ""}" data-k="${esc(k)}">${esc(k)}</button>`).join("");
+    if (!$("#nearList")) return;
+    const rateOf = (p) => ratings[p.id] && ratings[p.id].rating;
+    const badCount = items.filter((p) => rateOf(p) === "bad").length;
+    const shown = items
+      .filter((p) => rateOf(p) !== "bad" && (kind === "전체" || p.kind === kind))
+      .sort((a, b) => (rateOf(b) === "good") - (rateOf(a) === "good") || a.distance - b.distance);
+    $("#nearList").innerHTML = shown.length ? shown.map((p) => `
+      <div class="result" data-i="${items.indexOf(p)}">
+        <button class="result-main" data-act="open">
+          <div class="result-name">${esc(p.place_name)}${rateOf(p) === "good" ? `<span class="good-badge">👍 우리 맛집</span>` : ""}</div>
+          <div class="result-sub">${esc(p.detail)} · ${p.distance >= 1000 ? (p.distance / 1000).toFixed(1) + "km" : p.distance + "m"}</div>
+        </button>
+        <button class="rate ${rateOf(p) === "good" ? "on" : ""}" data-act="good" aria-label="좋아요">👍</button>
+        <button class="rate" data-act="bad" aria-label="별로예요">👎</button>
+      </div>`).join("")
+      : `<div class="msg">${pager && pager.hasNextPage ? "가까운 곳은 모두 제외된 식당이에요. 더 보기를 눌러 보세요." : "이 범위에는 추천할 음식점이 없어요. 반경을 넓혀 보세요."}</div>`;
+    if (pager && pager.hasNextPage) $("#nearList").innerHTML += `<button class="btn full" id="more">더 보기</button>`;
+    const notes = [];
+    if (skipped) notes.push(`해산물·내장류·날 것 식당 ${skipped}곳`);
+    if (badCount) notes.push(`별로였던 곳 ${badCount}곳`);
+    if (notes.length) $("#nearList").innerHTML += `<div class="hint" style="text-align:center;margin-top:8px">${notes.join(", ")}은 뺐어요.</div>`;
+    const more = $("#more");
+    if (more) more.onclick = () => { more.textContent = "불러오는 중…"; pager.nextPage(); };
+  };
+
+  const load = () => {
+    items = []; pager = null; kind = "전체"; skipped = 0;
+    $("#nearList").innerHTML = `<div class="msg">찾는 중…</div>`;
+    places.categorySearch("FD6", (data, status, pagination) => {
+      if (status === kakao.maps.services.Status.OK) {
+        pager = pagination;
+        const meals = data.filter(isMeal);
+        const ok = meals.filter((p) => !isExcluded(p));
+        skipped += meals.length - ok.length;
+        items.push(...ok.map((p) => {
+          const parts = p.category_name.split(" > ");
+          return { ...p, distance: +p.distance, kind: parts[1] || "기타", detail: parts.slice(1).join(" · ") };
+        }));
+        // 밥집이 10곳보다 적으면 다음 묶음(15곳씩, 최대 45곳)을 자동으로 더 불러옴
+        if (items.length < 10 && pagination.hasNextPage) return pagination.nextPage();
+      }
+      draw();
+    }, { location: center, radius, sort: kakao.maps.services.SortBy.DISTANCE });
+  };
+
+  $("#radius").onclick = (e) => {
+    const b = e.target.closest(".chip");
+    if (!b) return;
+    radius = +b.dataset.r;
+    document.querySelectorAll("#radius .chip").forEach((x) => x.classList.toggle("on", x === b));
+    load();
+  };
+  $("#kinds").onclick = (e) => {
+    const b = e.target.closest(".chip");
+    if (!b) return;
+    kind = b.dataset.k;
+    draw();
+  };
+  $("#nearList").onclick = async (e) => {
+    const b = e.target.closest("button[data-act]");
+    if (!b) return;
+    const p = items[+b.closest(".result").dataset.i];
+    const act = b.dataset.act;
+    if (act === "open") return openNaver(p.place_name + " " + (regionOf(p.address_name) || region));
+    const now = ratings[p.id] && ratings[p.id].rating;
+    try {
+      if (act === "good" && now === "good") { await rstore.remove(p.id); toast("평가를 지웠어요"); }
+      else {
+        await rstore.set(p.id, { name: p.place_name, address: p.road_address_name || p.address_name, kind: p.kind, rating: act, by: me || "" });
+        toast(act === "good" ? "우리 맛집으로 저장했어요 👍" : "다음부터 추천하지 않을게요");
+      }
+    } catch (err) { console.error(err); toast("평가를 저장하지 못했어요"); }
+  };
+  nearRedraw = draw;
+  load();
+}
+
+// ---------- 오늘 어디 갈까? ----------
+$("#btnPick").addEventListener("click", () => {
+  const pool = cafes.filter((c) => !c.visited);
+  const from = pool.length ? pool : cafes;
+  if (!from.length) return toast("먼저 카페를 추가해 주세요");
+  const c = from[Math.floor(Math.random() * from.length)];
+  openSheet(`
+    <h2><span></span><button class="close">✕</button></h2>
+    <div class="big-pick">
+      <div class="emoji">☕</div>
+      <div class="hint">오늘은 여기 어때요?</div>
+      <div class="name">${esc(c.name)}</div>
+      ${c.address ? `<div class="card-addr">${esc(c.address)}</div>` : ""}
+      ${c.memo ? `<div class="card-memo">${esc(c.memo)}</div>` : ""}
+    </div>
+    <button class="btn main full" id="pNear">🍽 근처 맛집 보기</button>
+    <button class="btn naver full" id="pNaver" style="margin-top:8px">네이버지도에서 보기</button>
+    <button class="btn full" id="pAgain" style="margin-top:8px">🎲 다시 뽑기</button>`);
+  $("#pNear").onclick = () => openNearby(c);
+  $("#pNaver").onclick = () => openNaver(c.name + " " + regionOf(c.address), c.naverUrl);
+  $("#pAgain").onclick = () => $("#btnPick").click();
+});
+
+// ---------- 설정 (커플 코드, 내 이름) ----------
+$("#btnSettings").addEventListener("click", openSettings);
+
+function shareLink() {
+  const u = new URL(location.href);
+  u.search = "";
+  u.searchParams.set("room", room);
+  return u.toString();
+}
+
+function ratedListHtml() {
+  const list = Object.entries(ratings).sort((a, b) => (a[1].rating > b[1].rating ? -1 : 1));
+  if (!list.length) return "";
+  return `<label>평가한 맛집 (👎는 추천에서 빠져요)</label>
+    <div id="ratedList">${list.map(([id, r]) => `
+      <div class="rated"><span>${r.rating === "good" ? "👍" : "👎"} <b>${esc(r.name)}</b>${r.by ? ` · ${esc(r.by)}` : ""}</span>
+      <button class="btn" data-id="${esc(id)}">평가 지우기</button></div>`).join("")}</div>`;
+}
+
+function openSettings(first = false) {
+  openSheet(`
+    <h2><span>${first === true ? "처음 설정" : "설정"}</span>${first === true ? "" : `<button class="close">✕</button>`}</h2>
+    <label>내 이름 (누가 추가했는지 보여 줘요)</label>
+    <input type="text" id="sMe" value="${esc(me)}" placeholder="예: 쵸키맘">
+    ${useFirebase ? `
+      <label>커플 코드</label>
+      ${room ? `
+        <div class="code">${esc(room)}</div>
+        <button class="btn main full" id="sShare">💌 애인에게 링크 보내기</button>
+        <div class="hint">이 링크로 열면 같은 리스트를 함께 써요. 코드는 둘만 아는 비밀번호처럼 다뤄 주세요.</div>
+        <label>다른 코드로 바꾸기</label>` : `
+        <button class="btn main full" id="sNew">새 커플 코드 만들기</button>
+        <label>애인이 만든 코드가 있으면 입력</label>`}
+      <div class="row"><input type="text" id="sCode" placeholder="date-xxxxxxxxxxxx" autocapitalize="off"><button class="btn" id="sJoin">입력</button></div>
+    ` : `<div class="banner" style="margin-top:14px">지금은 <b>이 폰에만 저장</b>돼요. Firebase를 설정하면 애인과 같이 쓸 수 있어요.</div>`}
+    ${first === true ? "" : ratedListHtml()}
+    <button class="btn full" id="sSave" style="margin-top:16px">${first === true ? "시작하기" : "닫기"}</button>`);
+  const rl = $("#ratedList");
+  if (rl) rl.onclick = async (e) => {
+    const b = e.target.closest("button[data-id]");
+    if (!b) return;
+    await rstore.remove(b.dataset.id);
+    b.closest(".rated").remove();
+    toast("평가를 지웠어요. 다시 추천에 나와요");
+  };
+  const saveMe = () => { me = $("#sMe").value.trim(); ls.set("dateapp.me", me); };
+  const switchRoom = (code) => { ls.set("dateapp.room", code); location.href = location.pathname + "?room=" + encodeURIComponent(code); };
+  if (useFirebase) {
+    $("#sJoin").onclick = () => {
+      const code = $("#sCode").value.trim();
+      if (code.length < 12) return toast("코드를 정확히 입력해 주세요");
+      saveMe(); switchRoom(code);
+    };
+    if ($("#sNew")) $("#sNew").onclick = () => { saveMe(); switchRoom(newRoomCode()); };
+    if ($("#sShare")) $("#sShare").onclick = async () => {
+      const link = shareLink();
+      try {
+        if (navigator.share) await navigator.share({ title: "우리 데이트", text: "우리 데이트 카페 리스트 같이 쓰자!", url: link });
+        else { await navigator.clipboard.writeText(link); toast("링크를 복사했어요"); }
+      } catch {}
+    };
+  }
+  $("#sSave").onclick = () => {
+    saveMe();
+    if (useFirebase && !room) return toast("커플 코드를 만들거나 입력해 주세요");
+    closeSheet();
+  };
+}
+
+// ---------- 시작 ----------
+async function start() {
+  if (useFirebase && room) {
+    try { store = await firebaseStore(room, "cafes"); rstore = await firebaseStore(room, "ratings"); }
+    catch (err) { console.error(err); toast("Firebase 연결에 실패해서 이 폰에만 저장해요"); store = localStore("cafes"); rstore = localStore("ratings"); }
+  } else {
+    store = localStore("cafes");
+    rstore = localStore("ratings");
+  }
+  rstore.subscribe((list) => {
+    ratings = Object.fromEntries(list.map((r) => [r.id, r]));
+    if (nearRedraw) nearRedraw();
+  });
+  const notes = [];
+  if (!useFirebase) notes.push("지금은 <b>이 폰에만 저장</b>돼요.");
+  if (!CFG.KAKAO_JS_KEY) notes.push("카카오 키가 없어서 검색 대신 <b>직접 입력</b>해요.");
+  $("#banner").innerHTML = notes.length ? `<div class="banner">${notes.join(" ")}</div>` : "";
+  store.subscribe((list) => { cafes = list; render(); });
+  if (useFirebase && !room) openSettings(true);
+  else if (!me) openSettings(true);
+}
+start();
+</script>
+</body>
+</html>

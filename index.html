@@ -71,8 +71,14 @@ header h1 { font-size: 22px; margin: 0; flex: 1; }
 .pick.alt { background: var(--card); color: var(--accent); }
 .chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 10px; scrollbar-width: none; }
 .chips::-webkit-scrollbar { display: none; }
-.sortbar { display: flex; align-items: center; gap: 6px; margin: -2px 0 10px; font-size: 13px; color: var(--sub); }
-.sortbar .chip { padding: 5px 11px; font-size: 13px; }
+.listbar { display: flex; align-items: flex-start; gap: 6px; margin-bottom: 10px; }
+.listbar .chips { flex: 1; min-width: 0; margin-bottom: 0; }
+/* 정렬 고르기: 누르면 아이폰 선택 창이 떠요 (글자 16px 미만이면 아이폰이 화면을 확대해서 16px) */
+.sort-select {
+  flex: none; appearance: none; -webkit-appearance: none; font: inherit; font-size: 16px; color: var(--text);
+  padding: 4px 24px 4px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--card)
+  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23999' stroke-width='1.6'/%3E%3C/svg%3E") no-repeat right 9px center;
+}
 .card-dist { color: var(--accent); font-size: 14px; font-weight: 700; white-space: nowrap; padding-top: 2px; }
 .chip { flex: none; padding: 7px 14px; border-radius: 999px; background: var(--card); border: 1px solid var(--line); font-size: 14px; }
 .chip.on { background: var(--text); color: var(--bg); border-color: var(--text); }
@@ -172,16 +178,17 @@ textarea { min-height: 70px; resize: vertical; }
     <div class="hint">체크하면 그 특징이 있는 카페에서만 뽑아요</div>
     <div class="checks" id="pickTags"></div>
   </div>
-  <div class="chips" id="filters">
-    <button class="chip on" data-f="all">전체</button>
-    <button class="chip" data-f="todo">안 가본 곳</button>
-    <button class="chip" data-f="done">가본 곳</button>
-  </div>
-  <div class="sortbar" id="sorts">
-    <span>정렬</span>
-    <button class="chip" data-s="name">가나다순</button>
-    <button class="chip" data-s="added">추가순</button>
-    <button class="chip" data-s="dist">거리순</button>
+  <div class="listbar">
+    <div class="chips" id="filters">
+      <button class="chip on" data-f="all">전체</button>
+      <button class="chip" data-f="todo">안 가본 곳</button>
+      <button class="chip" data-f="done">가본 곳</button>
+    </div>
+    <select class="sort-select" id="sortSel" aria-label="정렬">
+      <option value="name">가나다순</option>
+      <option value="added">추가순</option>
+      <option value="dist">거리순</option>
+    </select>
   </div>
   <div class="hint" id="distHint" style="display:none;margin:-4px 0 10px">📍 거리는 금강로 431(구서백리명가에덴)에서 잰 직선거리예요</div>
   <div id="list"></div>
@@ -401,14 +408,12 @@ $("#list").addEventListener("click", (e) => {
 });
 
 const markSort = () => {
-  document.querySelectorAll("#sorts .chip").forEach((x) => x.classList.toggle("on", x.dataset.s === sortBy));
+  $("#sortSel").value = sortBy;
   $("#distHint").style.display = sortBy === "dist" ? "" : "none";
 };
 markSort();
-$("#sorts").addEventListener("click", (e) => {
-  const b = e.target.closest(".chip");
-  if (!b) return;
-  sortBy = b.dataset.s;
+$("#sortSel").addEventListener("change", (e) => {
+  sortBy = e.target.value;
   ls.set("dateapp.sort", sortBy);
   markSort();
   render();

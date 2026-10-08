@@ -60,10 +60,13 @@ header h1 { font-size: 22px; margin: 0; flex: 1; }
 .banner { background: var(--accent-soft); border-radius: 14px; padding: 10px 14px; font-size: 14px; margin-bottom: 12px; }
 .banner b { color: var(--accent); }
 
+.picks { display: flex; gap: 8px; margin-bottom: 14px; }
 .pick {
-  width: 100%; padding: 16px; border-radius: 18px; margin-bottom: 14px;
-  background: var(--accent); color: #fff; font-size: 17px; font-weight: 700; box-shadow: var(--shadow);
+  flex: 1; padding: 14px 8px; border-radius: 18px;
+  background: var(--accent); color: #fff; font-size: 16px; font-weight: 700; box-shadow: var(--shadow); word-break: keep-all;
 }
+.pick small { display: block; font-size: 12px; font-weight: 500; opacity: .85; margin-top: 2px; }
+.pick.alt { background: var(--card); color: var(--accent); }
 .chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 10px; scrollbar-width: none; }
 .chips::-webkit-scrollbar { display: none; }
 .chip { flex: none; padding: 7px 14px; border-radius: 999px; background: var(--card); border: 1px solid var(--line); font-size: 14px; }
@@ -148,7 +151,10 @@ textarea { min-height: 70px; resize: vertical; }
     <button class="icon-btn" id="btnSettings" aria-label="설정">⚙️</button>
   </header>
   <div id="banner"></div>
-  <button class="pick" id="btnPick">🎲 오늘 어디 갈까?</button>
+  <div class="picks">
+    <button class="pick" id="btnPickAll">🎲 전체에서 뽑기<small>가본 곳도 포함</small></button>
+    <button class="pick alt" id="btnPickNew">✨ 새로운 곳만<small>안 가본 곳에서</small></button>
+  </div>
   <div class="chips" id="filters">
     <button class="chip on" data-f="all">전체</button>
     <button class="chip" data-f="todo">안 가본 곳</button>
@@ -556,17 +562,23 @@ async function openNearby(cafe) {
 }
 
 // ---------- 오늘 어디 갈까? ----------
-$("#btnPick").addEventListener("click", () => {
-  const pool = cafes.filter((c) => !c.visited);
-  const from = pool.length ? pool : cafes;
-  if (!from.length) return toast("먼저 카페를 추가해 주세요");
+// onlyNew: true면 안 가본 곳만, false면 가본 곳까지 전체에서
+let lastPickId = null;
+function pickCafe(onlyNew) {
+  if (!cafes.length) return toast("먼저 카페를 추가해 주세요");
+  const pool = onlyNew ? cafes.filter((c) => !c.visited) : cafes;
+  if (!pool.length) return toast("안 가본 카페가 없어요. 새 카페를 추가하거나 전체에서 뽑아 보세요");
+  // 다시 뽑기를 눌렀을 때 방금 나온 곳은 (다른 곳이 있으면) 빼기
+  const from = pool.length > 1 ? pool.filter((c) => c.id !== lastPickId) : pool;
   const c = from[Math.floor(Math.random() * from.length)];
+  lastPickId = c.id;
   openSheet(`
     <h2><span></span><button class="close">✕</button></h2>
     <div class="big-pick">
       <div class="emoji">☕</div>
-      <div class="hint">오늘은 여기 어때요?</div>
+      <div class="hint">${onlyNew ? "✨ 새로운 곳 중에서" : "🎲 전체에서"} · 오늘은 여기 어때요?</div>
       <div class="name">${esc(c.name)}</div>
+      ${c.visited ? `<div style="margin-top:6px"><span class="badge">가봤어요</span></div>` : ""}
       ${c.address ? `<div class="card-addr">${esc(c.address)}</div>` : ""}
       ${c.memo ? `<div class="card-memo">${esc(c.memo)}</div>` : ""}
     </div>
@@ -575,8 +587,10 @@ $("#btnPick").addEventListener("click", () => {
     <button class="btn full" id="pAgain" style="margin-top:8px">🎲 다시 뽑기</button>`);
   $("#pNear").onclick = () => openNearby(c);
   $("#pNaver").onclick = () => openNaver(c.name + " " + regionOf(c.address), c.naverUrl);
-  $("#pAgain").onclick = () => $("#btnPick").click();
-});
+  $("#pAgain").onclick = () => pickCafe(onlyNew);
+}
+$("#btnPickAll").addEventListener("click", () => pickCafe(false));
+$("#btnPickNew").addEventListener("click", () => pickCafe(true));
 
 // ---------- 설정 (커플 코드, 내 이름) ----------
 $("#btnSettings").addEventListener("click", openSettings);

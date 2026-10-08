@@ -73,7 +73,7 @@ header h1 { font-size: 22px; margin: 0; flex: 1; }
 .chips::-webkit-scrollbar { display: none; }
 .sortbar { display: flex; align-items: center; gap: 6px; margin: -2px 0 10px; font-size: 13px; color: var(--sub); }
 .sortbar .chip { padding: 5px 11px; font-size: 13px; }
-.card-dist { color: var(--accent); font-size: 13px; font-weight: 600; margin-top: 2px; }
+.card-dist { color: var(--accent); font-size: 14px; font-weight: 700; white-space: nowrap; padding-top: 2px; }
 .chip { flex: none; padding: 7px 14px; border-radius: 999px; background: var(--card); border: 1px solid var(--line); font-size: 14px; }
 .chip.on { background: var(--text); color: var(--bg); border-color: var(--text); }
 
@@ -183,6 +183,7 @@ textarea { min-height: 70px; resize: vertical; }
     <button class="chip" data-s="added">추가순</button>
     <button class="chip" data-s="dist">거리순</button>
   </div>
+  <div class="hint" id="distHint" style="display:none;margin:-4px 0 10px">📍 거리는 금강로 431(구서백리명가에덴)에서 잰 직선거리예요</div>
   <div id="list"></div>
 </div>
 <button class="fab" id="btnAdd">＋ 카페 추가</button>
@@ -332,7 +333,7 @@ function distFromHome(c) {
   const a = Math.sin(dLat / 2) ** 2 + Math.cos(rad(HOME.y)) * Math.cos(rad(+c.y)) * Math.sin(dLng / 2) ** 2;
   return 2 * R * Math.asin(Math.sqrt(a));
 }
-const fmtDist = (m) => (m < 1000 ? `${Math.round(m)}m` : `${(m / 1000).toFixed(m < 10000 ? 1 : 0)}km`);
+const fmtDist = (m) => `${(m / 1000).toFixed(m < 10000 ? 1 : 0)}km`;
 function sortCafes(list) {
   const byName = (a, b) => (a.name || "").localeCompare(b.name || "", "ko");
   if (sortBy === "added") return [...list].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
@@ -371,10 +372,10 @@ function render() {
     <div class="card ${c.visited ? "visited" : ""}" data-id="${esc(c.id)}">
       <div class="card-top">
         <div class="card-name">${esc(c.name)}</div>
+        ${sortBy === "dist" ? `<span class="card-dist">${distFromHome(c) == null ? "거리 모름" : "📍 " + fmtDist(distFromHome(c))}</span>` : ""}
         ${c.visited ? `<span class="badge">가봤어요</span>` : ""}
       </div>
       ${c.address ? `<div class="card-addr">${esc(c.address)}</div>` : ""}
-      ${sortBy === "dist" ? `<div class="card-dist">📍 ${distFromHome(c) == null ? "거리 정보 없음 (직접 입력한 카페)" : `${HOME.name}에서 ${fmtDist(distFromHome(c))}`}</div>` : ""}
       ${tagsHtml(c)}
       ${c.memo ? `<div class="card-memo">${esc(c.memo)}</div>` : ""}
       ${c.addedBy ? `<div class="card-by">${esc(c.addedBy)} 님이 추가</div>` : ""}
@@ -399,7 +400,10 @@ $("#list").addEventListener("click", (e) => {
   if (act === "edit") openEdit(cafe);
 });
 
-const markSort = () => document.querySelectorAll("#sorts .chip").forEach((x) => x.classList.toggle("on", x.dataset.s === sortBy));
+const markSort = () => {
+  document.querySelectorAll("#sorts .chip").forEach((x) => x.classList.toggle("on", x.dataset.s === sortBy));
+  $("#distHint").style.display = sortBy === "dist" ? "" : "none";
+};
 markSort();
 $("#sorts").addEventListener("click", (e) => {
   const b = e.target.closest(".chip");

@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>우리 데이트</title>
+<title>병가’s 데이트</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="우리 데이트">
+<meta name="apple-mobile-web-app-title" content="병가’s 데이트">
 <meta name="theme-color" content="#fff7f3">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-180.png">
@@ -56,6 +56,13 @@ button { cursor: pointer; border: 0; background: none; }
 header { padding: 18px 0 10px; display: flex; align-items: center; gap: 10px; }
 header h1 { font-size: 22px; margin: 0; flex: 1; }
 .back-btn { flex: none; height: 40px; padding: 0 14px 0 10px; border-radius: 12px; background: var(--card); box-shadow: var(--shadow); font-size: 16px; font-weight: 600; color: var(--accent); }
+.icon-btn { flex: none; width: 40px; height: 40px; border-radius: 12px; background: var(--card); box-shadow: var(--shadow); font-size: 18px; }
+
+/* 저장한 곳 찾기: 글자를 쓰는 동안 바로 아래에 맞는 곳이 떠요 */
+.find-item .result-name mark { background: var(--accent-soft); color: var(--accent); border-radius: 4px; padding: 0 1px; }
+.find-emoji { font-size: 22px; flex: none; }
+.card.flash { animation: flash 2s ease-out; }
+@keyframes flash { 0%, 40% { box-shadow: 0 0 0 3px var(--accent); } 100% { box-shadow: var(--shadow); } }
 
 /* 홈 맨 위: 동그란 프로필 사진 + 제목 */
 .home-top { text-align: center; padding: 30px 0 18px; }
@@ -232,7 +239,7 @@ textarea { min-height: 70px; resize: vertical; }
 <div class="wrap" id="homeView">
   <div class="home-top">
     <button class="avatar" id="avatar" aria-label="프로필 사진"></button>
-    <h1 class="home-title">병가 데이트</h1>
+    <h1 class="home-title">병가’s 데이트</h1>
   </div>
   <div class="menu">
     <button class="menu-item" data-go="cafe">
@@ -243,6 +250,11 @@ textarea { min-height: 70px; resize: vertical; }
     <button class="menu-item" data-go="food">
       <span class="menu-emoji">🍽</span>
       <span class="menu-text"><b>병가 맛집 데이트</b><small>맛집 리스트 · 뽑기 · 근처 카페</small></span>
+      <span class="menu-arrow">›</span>
+    </button>
+    <button class="menu-item" id="btnFindHome">
+      <span class="menu-emoji">🔍</span>
+      <span class="menu-text"><b>저장한 곳 찾기</b><small>추가한 카페 · 맛집 검색</small></span>
       <span class="menu-arrow">›</span>
     </button>
     <button class="menu-item" id="btnRated">
@@ -263,6 +275,7 @@ textarea { min-height: 70px; resize: vertical; }
   <header>
     <button class="back-btn" data-go="home">‹ 홈</button>
     <h1 id="listTitle">☕ 병가 카페 데이트</h1>
+    <button class="icon-btn" id="btnFind" aria-label="저장한 곳 찾기">🔍</button>
   </header>
   <div id="banner"></div>
   <div class="picks">
@@ -984,6 +997,103 @@ function pickCafe(onlyNew) {
 $("#btnPickAll").addEventListener("click", () => pickCafe(false));
 $("#btnPickNew").addEventListener("click", () => pickCafe(true));
 
+// ---------- 저장한 곳 찾기 (홈 → 🔍, 리스트 화면 오른쪽 위 🔍) ----------
+// 한 글자씩 쓸 때마다 이름이 맞는 곳을 바로 보여 줘요(자동 완성). 초성(ㅋㅇ)이나 쓰다 만 글자(카 → 칸웨이)도 맞춰 줘요.
+const CHO = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ";
+const JONG = ["", "ㄱ", "ㄲ", "ㄳ", "ㄴ", "ㄵ", "ㄶ", "ㄷ", "ㄹ", "ㄺ", "ㄻ", "ㄼ", "ㄽ", "ㄾ", "ㄿ", "ㅀ", "ㅁ", "ㅂ", "ㅄ", "ㅅ", "ㅆ", "ㅇ", "ㅈ", "ㅊ", "ㅋ", "ㅌ", "ㅍ", "ㅎ"];
+const syl = (c) => (c >= "가" && c <= "힣" ? c.charCodeAt(0) - 0xac00 : -1);  // 한글 글자 번호 (아니면 -1)
+const choOf = (c) => (syl(c) < 0 ? c : CHO[Math.floor(syl(c) / 588)]);
+// 검색어 글자 q가 이름 글자 n과 맞는지. last: 검색어 마지막 글자(아직 쓰는 중일 수 있음), next: 이름의 다음 글자
+function charMatch(q, n, last, next) {
+  if (q === n) return true;
+  if (CHO.includes(q)) return choOf(n) === q;                       // 초성만: ㅋ → 칸
+  const a = syl(q), b = syl(n);
+  if (!last || a < 0 || b < 0 || Math.floor(a / 28) !== Math.floor(b / 28)) return false;
+  if (a % 28 === 0) return true;                                     // 받침 쓰기 전: 카 → 칸
+  return b % 28 === 0 && next != null && choOf(next) === JONG[a % 28]; // 다음 글자 첫소리가 받침으로 붙은 상태: 캎 → 카페
+}
+// 이름에서 검색어가 맞는 자리 (띄어쓰기는 무시). 없으면 null
+function findIn(text, query) {
+  const arr = [...String(text || "")], chars = [], idx = [];
+  arr.forEach((c, i) => { if (!/\s/.test(c)) { chars.push(c.toLowerCase()); idx.push(i); } });
+  const qs = [...query.toLowerCase().replace(/\s/g, "")];
+  for (let s = 0; s + qs.length <= chars.length; s++) {
+    if (qs.every((qc, k) => charMatch(qc, chars[s + k], k === qs.length - 1, chars[s + k + 1])))
+      return { arr, from: idx[s], to: idx[s + qs.length - 1] + 1, pos: s };
+  }
+  return null;
+}
+const markHit = (h) => esc(h.arr.slice(0, h.from).join("")) + `<mark>${esc(h.arr.slice(h.from, h.to).join(""))}</mark>` + esc(h.arr.slice(h.to).join(""));
+
+$("#btnFindHome").addEventListener("click", () => openFind("all"));
+$("#btnFind").addEventListener("click", () => openFind(mode));
+function openFind(tab) {
+  openSheet(`
+    <h2><span>🔍 저장한 곳 찾기</span><button class="close">✕</button></h2>
+    <input type="text" id="findQ" placeholder="이름·주소·메모 (초성도 돼요: ㅋㅇ)" enterkeyhint="search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+    <div class="chips" id="findTabs" style="margin-top:10px"></div>
+    <div id="findList"></div>`);
+  const q = $("#findQ");
+  let hits = [];
+  const draw = () => {
+    const text = q.value.trim();
+    // 이름이 맞는 곳 먼저(앞부분이 맞으면 더 위), 그다음 주소·메모만 맞는 곳
+    const all = text ? allPlaces.map((c) => {
+      const h = findIn(c.name, text);
+      if (h) return { c, h, score: h.pos === 0 ? 0 : 1 };
+      const t = norm(text);
+      if (norm(c.address).includes(t)) return { c, score: 2 };
+      if (norm(c.memo).includes(t)) return { c, score: 2, memo: true };
+      return null;
+    }).filter(Boolean) : [];
+    const count = (k) => all.filter((x) => k === "all" || kindOf(x.c) === k).length;
+    $("#findTabs").innerHTML = [["all", "전체"], ["cafe", "☕ 카페"], ["food", "🍽 맛집"]].map(([k, t]) =>
+      `<button class="chip ${k === tab ? "on" : ""}" data-k="${k}">${t}${text ? " " + count(k) : ""}</button>`).join("");
+    hits = all.filter((x) => tab === "all" || kindOf(x.c) === tab)
+      .sort((a, b) => a.score - b.score || (a.c.name || "").localeCompare(b.c.name || "", "ko")).slice(0, 50);
+    $("#findList").innerHTML = !text ? `<div class="msg">이름을 한 글자만 써도 바로 찾아 줘요</div>`
+      : !hits.length ? `<div class="msg">'${esc(text)}'에 맞는 곳이 없어요</div>`
+      : hits.map((x, i) => {
+        const tags = MODES[kindOf(x.c)].tags.filter((t) => x.c[t.key]).map((t) => t.label).join(" ");
+        const sub = x.memo ? "메모: " + x.c.memo : [x.c.address, tags].filter(Boolean).join(" · ");
+        return `<button class="result find-item" data-i="${i}">
+          <span class="find-emoji">${kindOf(x.c) === "food" ? "🍽" : "☕"}</span>
+          <div class="result-main">
+            <div class="result-name">${x.h ? markHit(x.h) : esc(x.c.name)}${x.c.visited ? `<span class="saved-badge">가봤어요</span>` : ""}</div>
+            ${sub ? `<div class="result-sub">${esc(sub)}</div>` : ""}
+          </div>
+        </button>`;
+      }).join("");
+  };
+  q.addEventListener("input", draw);
+  q.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.isComposing && hits[0]) { q.blur(); jumpTo(hits[0].c); } });
+  $("#findTabs").onclick = (e) => {
+    const b = e.target.closest(".chip");
+    if (!b) return;
+    tab = b.dataset.k; draw();
+  };
+  $("#findList").onclick = (e) => {
+    const r = e.target.closest(".find-item");
+    if (r) jumpTo(hits[+r.dataset.i].c);
+  };
+  draw();
+  q.focus();
+}
+// 고른 곳의 리스트 화면으로 가서 그 카드를 가운데로 보여 주고 잠깐 반짝여요
+function jumpTo(c) {
+  closeSheet();
+  go(kindOf(c));
+  if (filter !== "all") {
+    filter = "all";
+    document.querySelectorAll("#filters .chip").forEach((x) => x.classList.toggle("on", x.dataset.f === "all"));
+    render();
+  }
+  const card = document.querySelector(`#list .card[data-id="${CSS.escape(c.id)}"]`);
+  if (!card) return;
+  card.scrollIntoView({ block: "center" });
+  card.classList.remove("flash"); void card.offsetWidth; card.classList.add("flash");
+}
+
 // ---------- 설정 (커플 코드, 내 이름) ----------
 $("#btnSettings").addEventListener("click", openSettings);
 
@@ -1125,7 +1235,7 @@ function openSettings(first = false) {
     if ($("#sShare")) $("#sShare").onclick = async () => {
       const link = shareLink();
       try {
-        if (navigator.share) await navigator.share({ title: "우리 데이트", text: "우리 데이트 카페 리스트 같이 쓰자!", url: link });
+        if (navigator.share) await navigator.share({ title: "병가’s 데이트", text: "병가’s 데이트 리스트 같이 쓰자!", url: link });
         else { await navigator.clipboard.writeText(link); toast("링크를 복사했어요"); }
       } catch {}
     };

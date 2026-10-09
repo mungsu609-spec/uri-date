@@ -754,8 +754,8 @@ function render() {
       ${c.addedBy ? `<div class="card-by">${esc(c.addedBy)} 님이 추가</div>` : ""}
       <div class="actions one">
         <button class="btn main sm" data-act="near">${M().nearBtn}</button>
-        <button class="btn sm" data-act="park">🅿️ 주차장</button>
         <button class="btn naver sm" data-act="naver">N 지도</button>
+        <button class="btn sm" data-act="park">🅿️ 주차장</button>
         <button class="btn sm" data-act="edit">수정</button>
       </div>`; })()}
     </div>`).join("");
@@ -780,8 +780,8 @@ function groupCard(k, g, distTag) {
           ${c.memo ? `<div class="card-memo">${esc(c.memo)}</div>` : ""}
           <div class="actions one">
             <button class="btn main sm" data-act="near">${M().nearBtn}</button>
-            <button class="btn sm" data-act="park">🅿️ 주차장</button>
             <button class="btn naver sm" data-act="naver">N 지도</button>
+            <button class="btn sm" data-act="park">🅿️ 주차장</button>
             ${i === items.length - 1 ? `<button class="btn sm" data-act="gedit">수정</button>` : ""}
           </div>
         </div>`).join("")}
@@ -1314,11 +1314,14 @@ function loadParking() {
   return parkingData;
 }
 const won = (n) => n.toLocaleString("ko-KR") + "원";
-async function openParking(place) {
+// back이 있으면(오늘의 코스에서 열었을 때) 맨 위에 '‹ 코스로 돌아가기' 버튼
+async function openParking(place, back) {
   const naverNear = () => openNaver(`${place.name} 근처 주차장`);
   openSheet(`
+    ${back ? `<button class="btn sm" id="parkBack" style="margin-bottom:10px">‹ ${esc(back.label)}</button>` : ""}
     <h2><span>🅿️ ${esc(place.name)} 근처 주차장</span><button class="close">✕</button></h2>
     <div id="parkBody"><div class="msg">불러오는 중…</div></div>`);
+  if (back) $("#parkBack").onclick = back.go;
   const body = $("#parkBody");
   let data;
   try { data = await loadParking(); } catch (e) { console.error(e); }
@@ -1661,7 +1664,7 @@ function kakaoNearby(kind, base) {
   return new Promise((resolve) => places.categorySearch(kind === "food" ? "FD6" : "CE7", (data, status, pager) => {
     if (status === kakao.maps.services.Status.OK) {
       found.push(...data.filter((p) => ok(p) && rate(p) !== "bad").map((p) => ({
-        name: p.place_name, address: p.road_address_name || p.address_name, d: +p.distance, good: rate(p) === "good", tags: [],
+        name: p.place_name, address: p.road_address_name || p.address_name, x: p.x, y: p.y, d: +p.distance, good: rate(p) === "good", tags: [],
         detail: kind === "food" ? p.category_name.split(" > ").slice(1).join(" · ") : "",
       })));
       if (found.length < 10 && pager.hasNextPage) return pager.nextPage();
@@ -1704,7 +1707,7 @@ async function openCourse(onlyNew, first = courseFirst) {
   const from = pool.length > 1 ? pool.filter((c) => c.id !== lastCourseId) : pool;
   const c0 = from[Math.floor(Math.random() * from.length)];
   lastCourseId = c0.id;
-  const saved = (c, kind) => ({ name: c.name, address: c.address, memo: c.memo, naverUrl: c.naverUrl, visited: c.visited, saved: true,
+  const saved = (c, kind) => ({ name: c.name, address: c.address, x: c.x, y: c.y, memo: c.memo, naverUrl: c.naverUrl, visited: c.visited, saved: true,
     tags: MODES[kind].tags.filter((t) => c[t.key]) });
   const one = saved(c0, first);
   const base = { x: +c0.x, y: +c0.y };
@@ -1728,7 +1731,7 @@ async function openCourse(onlyNew, first = courseFirst) {
       ${tagRow(p.tags)}
       ${p.memo ? `<div class="card-memo">${esc(p.memo)}</div>` : ""}
       ${p.saved || n === 1 ? "" : `<div class="hint">근처에 저장한 ${S.noun}${josa(S.noun, "이", "가")} 없어서 카카오에서 찾은 ${S.noun}${josa(S.noun, "이에요", "예요")}</div>`}
-      <div class="actions"><button class="btn naver" id="${id}">N 지도</button></div>
+      <div class="actions"><button class="btn naver" id="${id}">N 지도</button><button class="btn" id="${id}p">🅿️ 근처 주차장</button></div>
     </div>`;
   const draw = () => {
     const two = near[ci];
@@ -1741,6 +1744,17 @@ async function openCourse(onlyNew, first = courseFirst) {
       ${near.length > 1 ? `<button class="btn full" id="cNext" style="margin-top:8px">${B.emoji} ${B.noun}만 바꾸기 (${ci + 1}/${near.length})</button>` : ""}`;
     $("#cNv1").onclick = () => openNaver(one.name + " " + regionOf(one.address), one.naverUrl);
     $("#cNv2").onclick = () => (two ? openNaver(two.name + " " + regionOf(two.address), two.naverUrl) : openNaver(`${one.name} 근처 ${B.noun}`));
+    // 주차장 창을 닫지 않고 '‹ 코스로 돌아가기'를 누르면 방금 뽑은 코스 그대로 돌아와요(창 내용을 떼어 두었다가 다시 붙임)
+    const park = (p) => {
+      const kept = $("#sheet .wrap");
+      openParking(p, { label: "코스로 돌아가기", go: () => {
+        $("#sheet").innerHTML = `<div class="grab"></div>`;
+        $("#sheet").append(kept);
+        $("#sheet").scrollTop = 0;
+      } });
+    };
+    $("#cNv1p").onclick = () => park(one);
+    if (two) $("#cNv2p").onclick = () => park(two);
     $("#cAgain").onclick = () => openCourse(onlyNew, first);
     if ($("#cNext")) $("#cNext").onclick = () => { ci = (ci + 1) % near.length; draw(); };
   };
@@ -1925,8 +1939,8 @@ function selectPin(id) {
     ${c.memo ? `<div class="card-memo">${esc(c.memo)}</div>` : ""}
     <div class="actions">
       <button class="btn main sm" id="mcNear">${MO.nearBtn}</button>
-      <button class="btn sm park-btn" id="mcPark" aria-label="근처 주차장">🅿️</button>
       <button class="btn naver sm" id="mcNaver">N 지도</button>
+      <button class="btn sm park-btn" id="mcPark" aria-label="근처 주차장">🅿️</button>
       <button class="btn sm" id="mcList">리스트에서 보기</button>
     </div>`;
   card.hidden = false;

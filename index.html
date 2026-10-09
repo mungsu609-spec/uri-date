@@ -132,6 +132,12 @@ header h1 { font-size: 22px; margin: 0; flex: 1; }
   height: 56px; padding: 0 22px; border-radius: 28px; background: var(--text); color: var(--bg);
   font-weight: 700; font-size: 16px; box-shadow: 0 4px 16px rgba(0,0,0,.2);
 }
+/* 맨 위로 버튼: 조금 내려가면 왼쪽 아래에 나타나요 */
+.fab.top {
+  right: auto; left: max(16px, calc(50% - 264px)); width: 56px; padding: 0; font-size: 22px;
+  opacity: 0; pointer-events: none; transform: translateY(10px); transition: opacity .2s, transform .2s;
+}
+.fab.top.show { opacity: 1; pointer-events: auto; transform: none; }
 
 /* 아래에서 올라오는 창 */
 .sheet-bg { position: fixed; inset: 0; background: rgba(0,0,0,.35); display: none; z-index: 10; }
@@ -285,6 +291,7 @@ textarea { min-height: 70px; resize: vertical; }
   <div class="hint" id="distHint" style="display:none;margin:-4px 0 10px"></div>
   <div id="list"></div>
   <button class="fab" id="btnAdd">＋ 카페 추가</button>
+  <button class="fab top" id="btnTop" aria-label="맨 위로">↑</button>
 </div>
 
 <div class="sheet-bg" id="sheetBg"><div class="sheet" id="sheet"></div></div>
@@ -634,6 +641,9 @@ $("#sheetBg").addEventListener("click", (e) => {
 
 // ---------- 카페 추가 ----------
 $("#btnAdd").addEventListener("click", openAdd);
+$("#btnTop").addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
+const topBtn = () => $("#btnTop").classList.toggle("show", window.scrollY > 300);
+window.addEventListener("scroll", topBtn, { passive: true });
 
 async function openAdd() {
   const hasKakao = await kakaoReady;
@@ -1133,6 +1143,7 @@ function go(v) {
   $("#homeView").hidden = v !== "home";
   $("#listView").hidden = v === "home";
   window.scrollTo(0, 0);
+  topBtn();
   if (v !== "home") setMode(v);
   // 내 위치순이면 리스트 화면에 들어올 때 위치를 새로 찾아요
   if (v !== "home" && sortBy === "near" && !locating) locate("name", true);

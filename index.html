@@ -482,14 +482,41 @@ function isBadCafe(p) {
 
 // ---------- 카카오 장소 검색 ----------
 let places = null;
+let geocoder = null;    // 주소 → 지도 위치(좌표)
 const kakaoReady = new Promise((resolve) => {
   if (!CFG.KAKAO_JS_KEY) return resolve(false);
   const s = document.createElement("script");
   s.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${encodeURIComponent(CFG.KAKAO_JS_KEY)}&libraries=services&autoload=false`;
-  s.onload = () => kakao.maps.load(() => { places = new kakao.maps.services.Places(); resolve(true); });
+  s.onload = () => kakao.maps.load(() => {
+    places = new kakao.maps.services.Places();
+    geocoder = new kakao.maps.services.Geocoder();
+    resolve(true);
+  });
   s.onerror = () => resolve(false);
   document.head.appendChild(s);
 });
+
+// 직접 입력한 주소로 지도 위치 찾기 → { x, y } 또는 null
+// 번지·도로명까지 있는 주소만 써요 ("부산 금정구 장전동"처럼 동네만 쓰면 동네 가운데라 거리가 틀려서 안 써요)
+async function geocodeAddr(addr) {
+  addr = String(addr || "").trim();
+  if (!addr || !(await kakaoReady)) return null;
+  return new Promise((resolve) => geocoder.addressSearch(addr, (res, status) => {
+    const r = status === kakao.maps.services.Status.OK && res.find((a) => /_ADDR$/.test(a.address_type));
+    resolve(r ? { x: r.x, y: r.y } : null);
+  }));
+}
+// 위치를 모르는 저장 장소(직접 입력)는 주소로 위치를 찾아 채워 둬요. 못 찾으면 그 주소로는 다시 안 해요(geoFail)
+const geoTried = new Set();
+async function fillPositions(list) {
+  for (const c of list) {
+    if (c.x || !c.address || c.geoFail === c.address || geoTried.has(c.id + c.address)) continue;
+    geoTried.add(c.id + c.address);
+    const pos = await geocodeAddr(c.address);
+    try { await store.update(c.id, pos ? { x: pos.x, y: pos.y, geoFail: null } : { geoFail: c.address }); }
+    catch (err) { console.error(err); }
+  }
+}
 
 // ---------- 네이버지도 열기 ----------
 function regionOf(addr) {
@@ -611,6 +638,7 @@ function tagsHtml(c) {
 
 function render() {
   const list = $("#list");
+  knownBrands = [...new Set(cafes.map(baseBrand).filter(Boolean))];
   const shown = sortCafes(cafes.filter((c) => filter === "all" || (filter === "done" ? c.visited : !c.visited)));
   if (!cafes.length) {
     list.innerHTML = `<div class="empty">아직 저장한 ${M().noun}${josa(M().noun, "이", "가")} 없어요.<br>아래 <b>＋ ${M().noun} 추가</b>를 눌러 보세요.</div>`;
@@ -811,11 +839,31 @@ function kakaoBrand(p) {
   if (parts.length >= 3 && w.length >= 2 && norm(w[0]).endsWith(norm(parts[parts.length - 1]))) return { brand: w[0], branch: w.slice(1).join(" ") };
   return splitName(p.place_name);
 }
-const brandOf = (c) => c.brand || (splitName(c.name) || {}).brand || null;
+// 이름이 brand로 시작하면 나머지(지점 이름)를, 아니면 null. 띄어쓰기는 무시해요 ("수수하지만굉장해 덕천점" ↔ "수수하지만 굉장해")
+function stripBrand(name, brand) {
+  const n = [...String(name || "")], b = [...String(brand || "").replace(/\s/g, "").toLowerCase()];
+  let i = 0, j = 0;
+  while (i < n.length && j < b.length) {
+    if (/\s/.test(n[i])) { i++; continue; }
+    if (n[i].toLowerCase() !== b[j]) return null;
+    i++; j++;
+  }
+  return j === b.length ? n.slice(i).join("").trim() : null;
+}
+// 체인 이름: 저장할 때 알아낸 것 → 이름이 '… OO점' 모양 → 다른 곳에서 알아낸 체인 이름으로 시작하는 이름
+// (예: "수수하지만 굉장해 전포"는 '점'이 없지만 "수수하지만 굉장해 부산대점"이 있어서 같은 체인으로 봐요)
+let knownBrands = [];
+const baseBrand = (c) => c.brand || (splitName(c.name) || {}).brand || null;
+function brandOf(c) {
+  const b = baseBrand(c);
+  if (b) return b;
+  const hit = knownBrands.filter((k) => stripBrand(c.name, k)).sort((a, b2) => b2.length - a.length)[0];
+  return hit || null;
+}
 function branchOf(c) {
   if (c.branch) return c.branch;
   const b = brandOf(c);
-  return b && c.name.startsWith(b) ? c.name.slice(b.length).trim() || c.name : c.name;
+  return (b && stripBrand(c.name, b)) || c.name;
 }
 const placeFromKakao = (p) => ({ name: p.place_name, address: p.road_address_name || p.address_name, x: p.x, y: p.y, kakaoId: p.id, ...(kakaoBrand(p) || {}) });
 
@@ -913,10 +961,13 @@ function showForm(cafe, editing = false) {
     };
     return;
   }
+  // 카카오에서 고른 곳은 이름·주소가 정해져 있고, 직접 입력한 곳은 이름·주소를 고칠 수 있어요
+  const fromKakao = !!cafe.kakaoId;
   $("#form").innerHTML = `
-    ${cafe.x ? `<div class="picked" style="margin-top:12px"><b>${esc(cafe.name)}</b><div class="result-sub">${esc(cafe.address)}</div></div>` : `
+    ${fromKakao ? `<div class="picked" style="margin-top:12px"><b>${esc(cafe.name)}</b><div class="result-sub">${esc(cafe.address)}</div></div>` : `
       <label>${M().noun} 이름</label><input type="text" id="fName" value="${esc(cafe.name)}">
-      <label>주소 또는 동네 (선택)</label><input type="text" id="fAddr" value="${esc(cafe.address)}" placeholder="예: 서울 마포구 연남동">`}
+      <label>주소 (선택)</label><input type="text" id="fAddr" value="${esc(cafe.address)}" placeholder="예: 부산 금정구 금강로 431">
+      <div class="hint">도로명이나 번지까지 쓰면 지도 위치를 찾아서 거리·근처 추천·코스에 쓸 수 있어요.${editing ? (cafe.x ? " 📍 지금 위치를 알고 있어요." : " 지금은 위치를 몰라요.") : ""}</div>`}
     <label>네이버지도 링크 (선택)</label>
     <input type="url" id="fNaver" value="${esc(cafe.naverUrl)}" placeholder="https://naver.me/...">
     <div class="hint">네이버지도에서 ${M().noun} → 공유 → 링크 복사 후 붙여 넣으면, 누를 때 그 ${M().noun}${josa(M().noun, "이", "가")} 바로 열려요.</div>
@@ -929,25 +980,33 @@ function showForm(cafe, editing = false) {
     <button class="btn main full" id="fSave">${editing ? "수정 저장" : "저장"}</button>
     ${editing ? `<button class="btn full" id="fDel" style="color:#d04848">삭제</button>` : ""}`;
   $("#fSave").onclick = async () => {
-    const name = cafe.x ? cafe.name : $("#fName").value.trim();
+    const name = fromKakao ? cafe.name : $("#fName").value.trim();
     if (!name) return toast(`${M().noun} 이름을 적어 주세요`);
+    const address = fromKakao ? cafe.address : $("#fAddr").value.trim();
     if (!editing) {
-      const dup = findDuplicate({ name, address: cafe.x ? cafe.address : $("#fAddr").value.trim(), kakaoId: cafe.kakaoId });
+      const dup = findDuplicate({ name, address, kakaoId: cafe.kakaoId });
       if (dup) return toast(`'${dup.name}'은(는) 이미 저장한 ${M().noun}${josa(M().noun, "이에요", "예요")}`);
     }
     const data = {
-      name,
-      address: cafe.x ? cafe.address : $("#fAddr").value.trim(),
+      name, address,
       naverUrl: $("#fNaver").value.trim(),
       memo: $("#fMemo").value.trim(),
       ...Object.fromEntries(M().tags.map((t) => [t.key, $("#f_" + t.key).checked])),
     };
+    // 직접 입력한 곳: 주소로 지도 위치를 찾아서 거리·근처 추천·코스에 쓸 수 있게 해요
+    let posMsg = "";
+    if (!fromKakao && (address !== cafe.address || !cafe.x)) {
+      $("#fSave").textContent = "주소로 위치 찾는 중…";
+      const pos = address ? await geocodeAddr(address) : null;
+      Object.assign(data, pos ? { x: pos.x, y: pos.y, geoFail: null } : { x: null, y: null, geoFail: address || null });
+      if (address) posMsg = pos ? " · 주소로 위치를 찾았어요 📍" : " · 주소로 위치를 못 찾아서 거리는 안 나와요";
+    }
     try {
       if (editing) await store.update(cafe.id, data);
-      else await store.add({ ...data, kind: mode, x: cafe.x || null, y: cafe.y || null, kakaoId: cafe.kakaoId || null,
+      else await store.add({ x: cafe.x || null, y: cafe.y || null, ...data, kind: mode, kakaoId: cafe.kakaoId || null,
         brand: cafe.brand || null, branch: cafe.branch || null, visited: false, addedBy: me || "" });
       closeSheet();
-      toast(editing ? "수정했어요" : "저장했어요");
+      toast((editing ? "수정했어요" : "저장했어요") + posMsg);
     } catch (err) { console.error(err); toast("저장하지 못했어요"); }
   };
   if (editing) $("#fDel").onclick = async () => {
@@ -1665,7 +1724,7 @@ async function start() {
   if (!useFirebase) notes.push("지금은 <b>이 폰에만 저장</b>돼요.");
   if (!CFG.KAKAO_JS_KEY) notes.push("카카오 키가 없어서 검색 대신 <b>직접 입력</b>해요.");
   $("#banner").innerHTML = notes.length ? `<div class="banner">${notes.join(" ")}</div>` : "";
-  store.subscribe((list) => { allPlaces = list; splitPlaces(); });
+  store.subscribe((list) => { allPlaces = list; splitPlaces(); fillPositions(list); });
   if (useFirebase && !room) openSettings(true);
   else if (!me) openSettings(true);
 }

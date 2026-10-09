@@ -184,6 +184,12 @@ textarea { min-height: 70px; resize: vertical; }
 .big-pick .emoji { font-size: 44px; }
 .big-pick .name { font-size: 24px; font-weight: 800; margin-top: 6px; word-break: keep-all; }
 .code { font-family: ui-monospace, Menlo, monospace; font-size: 18px; letter-spacing: 1px; background: var(--card); padding: 12px; border-radius: 12px; text-align: center; user-select: all; }
+/* 예/아니오 묻는 작은 창 (아래 창보다 위에 떠요) */
+.ask-bg { position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 30; display: flex; align-items: center; justify-content: center; padding: 24px; }
+.ask { background: var(--bg); border-radius: 20px; padding: 22px 18px 16px; width: 100%; max-width: 340px; text-align: center; box-shadow: 0 8px 30px rgba(0,0,0,.25); }
+.ask-text { font-size: 16px; line-height: 1.5; word-break: keep-all; margin-bottom: 16px; }
+.ask-btns { display: flex; gap: 8px; }
+.ask-btns .btn { flex: 1; padding: 12px; font-size: 16px; }
 .toast {
   position: fixed; left: 0; right: 0; margin: 0 auto; width: fit-content; max-width: calc(100% - 32px);
   bottom: calc(env(safe-area-inset-bottom) + 90px); text-align: center;
@@ -213,7 +219,7 @@ textarea { min-height: 70px; resize: vertical; }
     </button>
     <button class="menu-item" id="btnSettings">
       <span class="menu-emoji">⚙️</span>
-      <span class="menu-text"><b>환경 설정</b><small>프로필 사진 · 내 이름 · 커플 코드 · 평가한 맛집</small></span>
+      <span class="menu-text"><b>환경 설정</b><small>프로필 사진 · 내 이름 · 커플 코드 · 평가한 곳</small></span>
       <span class="menu-arrow">›</span>
     </button>
   </div>
@@ -276,6 +282,23 @@ function toast(text) {
   t.classList.add("show");
   clearTimeout(toast.timer);
   toast.timer = setTimeout(() => t.classList.remove("show"), 1800);
+}
+
+// 예/아니오 묻는 창. 예를 누르면 true, 아니오(또는 바깥)를 누르면 false
+function askYesNo(html) {
+  return new Promise((resolve) => {
+    const bg = document.createElement("div");
+    bg.className = "ask-bg";
+    bg.innerHTML = `<div class="ask"><div class="ask-text">${html}</div>
+      <div class="ask-btns"><button class="btn" data-a="no">아니오</button><button class="btn main" data-a="yes">예</button></div></div>`;
+    bg.addEventListener("click", (e) => {
+      const b = e.target.closest("button[data-a]");
+      if (!b && e.target !== bg) return;
+      bg.remove();
+      resolve(!!b && b.dataset.a === "yes");
+    });
+    document.body.appendChild(bg);
+  });
 }
 
 // ---------- 커플 코드 / 내 이름 ----------
@@ -687,8 +710,8 @@ function openEdit(cafe) {
 // ---------- 근처 맛집 / 근처 카페 ----------
 // 카페 카드 → 근처 맛집(target "food"), 맛집 카드 → 근처 카페(target "cafe")
 const NEAR = {
-  food: { cat: "FD6", emoji: "🍽", word: "맛집", none: "추천할 음식점", rate: true },
-  cafe: { cat: "CE7", emoji: "☕", word: "카페", none: "카페", rate: false },
+  food: { cat: "FD6", emoji: "🍽", word: "맛집", none: "추천할 음식점", list: "병가 맛집 데이트" },
+  cafe: { cat: "CE7", emoji: "☕", word: "카페", none: "카페", list: "병가 카페 데이트" },
 };
 async function openNearby(cafe, target = "food") {
   const T = NEAR[target];
@@ -747,18 +770,18 @@ async function openNearby(cafe, target = "food") {
     if (!$("#nearList")) return;
     const rateOf = (p) => ratings[p.id] && ratings[p.id].rating;
     const badCount = pool.filter((p) => rateOf(p) === "bad").length;
-    // 순서: 사용자 추가 → 👍 우리 맛집 → 나머지, 각각 가까운 순
+    // 순서: 사용자 추가 → 👍 우리 맛집(카페) → 나머지, 각각 가까운 순
     const shown = pool
       .filter((p) => rateOf(p) !== "bad" && (kind === "전체" || p.kind === kind))
       .sort((a, b) => b.saved - a.saved || (rateOf(b) === "good") - (rateOf(a) === "good") || a.distance - b.distance);
     $("#nearList").innerHTML = shown.length ? shown.map((p) => `
       <div class="result" data-i="${pool.indexOf(p)}">
         <button class="result-main" data-act="open">
-          <div class="result-name">${esc(p.place_name)}${p.saved ? `<span class="saved-badge">사용자 추가</span>` : ""}${rateOf(p) === "good" ? `<span class="good-badge">👍 우리 맛집</span>` : ""}</div>
+          <div class="result-name">${esc(p.place_name)}${p.saved ? `<span class="saved-badge">사용자 추가</span>` : ""}${rateOf(p) === "good" ? `<span class="good-badge">👍 우리 ${T.word}</span>` : ""}</div>
           <div class="result-sub">${esc(p.detail)} · ${p.distance >= 1000 ? (p.distance / 1000).toFixed(1) + "km" : p.distance + "m"}</div>
         </button>
-        ${T.rate ? `<button class="rate ${rateOf(p) === "good" ? "on" : ""}" data-act="good" aria-label="좋아요">👍</button>
-        <button class="rate" data-act="bad" aria-label="별로예요">👎</button>` : ""}
+        <button class="rate ${rateOf(p) === "good" ? "on" : ""}" data-act="good" aria-label="좋아요">👍</button>
+        <button class="rate" data-act="bad" aria-label="별로예요">👎</button>
       </div>`).join("")
       : `<div class="msg">${pager && pager.hasNextPage ? "가까운 곳은 모두 제외된 식당이에요. 더 보기를 눌러 보세요." : `이 범위에는 ${T.none}${josa(T.none, "이", "가")} 없어요. 반경을 넓혀 보세요.`}</div>`;
     if (pager && pager.hasNextPage) $("#nearList").innerHTML += `<button class="btn full" id="more">더 보기</button>`;
@@ -815,11 +838,25 @@ async function openNearby(cafe, target = "food") {
     try {
       if (act === "good" && now === "good") { await rstore.remove(p.id); toast("평가를 지웠어요"); }
       else {
-        await rstore.set(p.id, { name: p.place_name, address: p.road_address_name || p.address_name, kind: p.kind, rating: act, by: me || "" });
-        toast(act === "good" ? "우리 맛집으로 저장했어요 👍" : "다음부터 추천하지 않을게요");
+        await rstore.set(p.id, { name: p.place_name, address: p.road_address_name || p.address_name, kind: p.kind, type: target, rating: act, by: me || "" });
+        toast(act === "good" ? `우리 ${T.word}${josa(T.word, "으로", "로")} 저장했어요 👍` : "다음부터 추천하지 않을게요");
+        // 👍인데 아직 리스트에 없는 곳이면 리스트에 넣을지 물어봐요
+        if (act === "good" && !p.saved && await askYesNo(`<b>${esc(p.place_name)}</b>을(를)<br>${T.list} 리스트에 추가할까요?`)) await addFromNearby(p);
       }
     } catch (err) { console.error(err); toast("평가를 저장하지 못했어요"); }
   };
+  // 근처 목록의 가게를 맛집(카페) 리스트에 바로 추가 — 카카오 분류로 한식·중식 같은 특징도 미리 체크
+  async function addFromNearby(p) {
+    const tagKey = target === "food" && FOOD_CAT_TAG[(p.category_name || "").split(" > ")[1]?.trim()];
+    await store.add({
+      name: p.place_name, address: p.road_address_name || p.address_name, naverUrl: "", memo: "",
+      ...Object.fromEntries(MODES[target].tags.map((t) => [t.key, t.key === tagKey])),
+      kind: target, x: p.x || null, y: p.y || null, kakaoId: p.id || null, visited: false, addedBy: me || "",
+    });
+    p.saved = true;
+    draw();
+    toast(`${T.list} 리스트에 추가했어요`);
+  }
   nearRedraw = draw;
   load();
 }
@@ -914,9 +951,9 @@ function squarePhoto(file, size = 400) {
 function ratedListHtml() {
   const list = Object.entries(ratings).sort((a, b) => (a[1].rating > b[1].rating ? -1 : 1));
   if (!list.length) return "";
-  return `<label>평가한 맛집 (👎는 추천에서 빠져요)</label>
+  return `<label>평가한 곳 (👎는 추천에서 빠져요)</label>
     <div id="ratedList">${list.map(([id, r]) => `
-      <div class="rated"><span>${r.rating === "good" ? "👍" : "👎"} <b>${esc(r.name)}</b>${r.by ? ` · ${esc(r.by)}` : ""}</span>
+      <div class="rated"><span>${r.rating === "good" ? "👍" : "👎"} ${r.type === "cafe" ? "☕" : "🍽"} <b>${esc(r.name)}</b>${r.by ? ` · ${esc(r.by)}` : ""}</span>
       <button class="btn" data-id="${esc(id)}">평가 지우기</button></div>`).join("")}</div>`;
 }
 

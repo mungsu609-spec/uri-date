@@ -163,6 +163,19 @@ textarea { min-height: 70px; resize: vertical; }
   background: var(--card); border: 1px solid var(--line); color: var(--text); font-size: 15px;
 }
 .checks input { width: 18px; height: 18px; margin: 0; accent-color: var(--accent); }
+/* 맛집 뽑기 칸: 누를 때마다 꺼짐 → ✓ 이것만 → ✕ 빼기 → 꺼짐 */
+.checks label.tri { cursor: pointer; user-select: none; -webkit-user-select: none; }
+.tri-box {
+  flex: none; width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid #9a8a86; background: var(--card);
+  display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; line-height: 1; color: #fff;
+}
+.checks label.tri[data-s="1"] { border-color: var(--accent); background: var(--accent-soft); }
+.tri[data-s="1"] .tri-box { background: var(--accent); border-color: var(--accent); }
+.tri[data-s="1"] .tri-box::after { content: "✓"; }
+.checks label.tri[data-s="2"] { color: var(--sub); background: var(--bg); }
+.tri[data-s="2"] .tri-name { text-decoration: line-through; }
+.tri[data-s="2"] .tri-box { background: #8a7a76; border-color: #8a7a76; }
+.tri[data-s="2"] .tri-box::after { content: "✕"; }
 /* 체크박스가 많을 때(맛집 8개): 4개씩 두 줄. 이모티콘은 '주차 가능'에만 두고 여백·체크 칸만 살짝 줄여요 (글자 크기는 그대로) */
 .checks.many { flex-direction: column; align-items: flex-start; gap: 8px; }
 .pick-filters .checks.many { align-items: center; }
@@ -895,19 +908,44 @@ async function openNearby(cafe, target = "food") {
 // ---------- 오늘 어디 갈까? ----------
 // onlyNew: true면 안 가본 곳만, false면 가본 곳까지 전체에서
 let lastPickId = null;
-// 뽑기 조건 체크박스 (체크한 특징을 모두 가진 카페에서만 뽑아요)
+// 뽑기 조건
+// 카페: 체크박스 — 체크한 특징을 모두 가진 카페에서만 뽑아요
+// 맛집: 누를 때마다 꺼짐 → ✓ 이것만 → ✕ 빼기. 음식 종류는 ✓ 중 하나라도, 주차 가능은 반드시, ✕는 하나라도 붙으면 빼요
+const triMode = () => mode === "food";
 const drawPickTags = () => {
-  $("#pickTags").innerHTML = checkRows(M().tags.map((t) => `
-  <label class="check" data-k="${t.key}"><input type="checkbox" data-tag="${t.key}">${checkLabel(t)}</label>`));
+  $("#pickHint").textContent = triMode() ? "한 번 누르면 이것만, 두 번 누르면 빼고 뽑아요"
+    : `체크하면 그 특징이 있는 ${M().noun}에서만 뽑아요`;
+  $("#pickTags").innerHTML = checkRows(M().tags.map((t) => triMode()
+    ? `<label class="check tri" data-k="${t.key}" data-tag="${t.key}" data-s="0"><span class="tri-box"></span>${checkLabel(t).replace(/<\/span>(.*)$/, '</span><span class="tri-name">$1</span>')}</label>`
+    : `<label class="check" data-k="${t.key}"><input type="checkbox" data-tag="${t.key}">${checkLabel(t)}</label>`));
 };
-const pickTagsOn = () => M().tags.filter((t) => $(`#pickTags [data-tag="${t.key}"]`).checked);
+$("#pickTags").addEventListener("click", (e) => {
+  const b = e.target.closest(".tri");
+  if (!b) return;
+  b.dataset.s = (+b.dataset.s + 1) % 3;
+});
+const tagState = (t) => {
+  const el = $(`#pickTags [data-tag="${t.key}"]`);
+  return triMode() ? +el.dataset.s : el.checked ? 1 : 0;
+};
+function pickCond() {
+  const on = M().tags.filter((t) => tagState(t) === 1);
+  const off = M().tags.filter((t) => tagState(t) === 2);
+  const any = triMode() ? on.filter((t) => t.key !== "parking") : [];   // 음식 종류: 하나라도
+  const all = triMode() ? on.filter((t) => t.key === "parking") : on;   // 주차 가능(카페는 전부): 반드시
+  const names = (l) => l.map((t) => t.label);
+  const desc = [any.length ? names(any).join(" 또는 ") : "", all.length ? names(all).join(" + ") : "",
+    off.length ? names(off).join("·") + " 빼고" : ""].filter(Boolean).join(" · ");
+  const test = (c) => all.every((t) => c[t.key]) && (!any.length || any.some((t) => c[t.key])) && !off.some((t) => c[t.key]);
+  return { desc, test };
+}
 
 function pickCafe(onlyNew) {
   if (!cafes.length) return toast(`먼저 ${M().noun}${josa(M().noun, "을", "를")} 추가해 주세요`);
-  const want = pickTagsOn();
-  const pool = cafes.filter((c) => (!onlyNew || !c.visited) && want.every((t) => c[t.key]));
+  const want = pickCond();
+  const pool = cafes.filter((c) => (!onlyNew || !c.visited) && want.test(c));
   if (!pool.length) {
-    if (want.length) return toast(`${onlyNew ? "안 가본 곳 중에 " : ""}${want.map((t) => t.label).join(" + ")} ${M().noun}${josa(M().noun, "이", "가")} 없어요`);
+    if (want.desc) return toast(`${onlyNew ? "안 가본 곳 중에 " : ""}${want.desc} 조건에 맞는 ${M().noun}${josa(M().noun, "이", "가")} 없어요`);
     return toast(`안 가본 ${M().noun}${josa(M().noun, "이", "가")} 없어요. 새 ${M().noun}${josa(M().noun, "을", "를")} 추가하거나 전체에서 뽑아 보세요`);
   }
   // 다시 뽑기를 눌렀을 때 방금 나온 곳은 (다른 곳이 있으면) 빼기
@@ -918,7 +956,7 @@ function pickCafe(onlyNew) {
     <h2><span></span><button class="close">✕</button></h2>
     <div class="big-pick">
       <div class="emoji">${M().emoji}</div>
-      <div class="hint">${onlyNew ? "✨ 새로운 곳 중에서" : "🎲 전체에서"}${want.length ? " · " + want.map((t) => t.label).join(" + ") : ""}</div>
+      <div class="hint">${onlyNew ? "✨ 새로운 곳 중에서" : "🎲 전체에서"}${want.desc ? " · " + want.desc : ""}</div>
       <div class="hint">오늘은 여기 어때요?</div>
       <div class="name">${esc(c.name)}</div>
       ${c.visited ? `<div style="margin-top:6px"><span class="badge">가봤어요</span></div>` : ""}
@@ -1108,7 +1146,6 @@ function setMode(m) {
     document.querySelectorAll("#filters .chip").forEach((x) => x.classList.toggle("on", x.dataset.f === "all"));
   }
   $("#listTitle").textContent = M().title;
-  $("#pickHint").textContent = `체크하면 그 특징이 있는 ${M().noun}에서만 뽑아요`;
   $("#btnAdd").textContent = `＋ ${M().noun} 추가`;
   $("#pickTags").classList.toggle("many", M().tags.length > 6);
   drawPickTags();

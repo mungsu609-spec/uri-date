@@ -145,6 +145,13 @@ header h1 { font-size: 22px; margin: 0; flex: 1; }
 .branch-name { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-weight: 600; font-size: 15px; }
 .branch .actions { margin-top: 6px; gap: 5px; }
 .branch.visited { opacity: .7; }
+/* 오른쪽 위 가봤어요 버튼: 기본은 회색 '안 가봤어요', 누르면 초록 '가봤어요' */
+.visit-toggle { font-size: 12px; padding: 3px 9px; border-radius: 999px; background: var(--bg); color: var(--sub); border: 1px solid var(--line); white-space: nowrap; flex: none; }
+.visit-toggle.on { background: var(--done-soft); color: var(--done); border-color: transparent; font-weight: 600; }
+.branch-name .visit-toggle { margin-left: auto; font-weight: 400; }
+/* 근처·주차장·지도·수정 버튼은 한 줄로 */
+.actions.one { flex-wrap: nowrap; }
+.actions.one .btn { flex: 1 1 auto; min-width: 0; white-space: nowrap; padding-left: 4px; padding-right: 4px; text-align: center; }
 /* 지점마다 따로 쓰는 칸 (여러 지점 추가·체인 수정 창) */
 .branch-form { background: var(--card); border-radius: 14px; padding: 12px 12px 14px; margin-top: 10px; box-shadow: var(--shadow); }
 .branch-form label:first-of-type { margin-top: 8px; }
@@ -739,18 +746,17 @@ function render() {
       <div class="card-top">
         <div class="card-name">${esc(c.name)}</div>
         ${distTag(c)}
-        ${c.visited ? `<span class="badge">가봤어요</span>` : ""}
+        <button class="visit-toggle ${c.visited ? "on" : ""}" data-act="visit" aria-pressed="${c.visited}">${c.visited ? "✓ 가봤어요" : "안 가봤어요"}</button>
       </div>
       ${c.address ? `<div class="card-addr">${esc(c.address)}</div>` : ""}
       ${tagsHtml(c)}
       ${c.memo ? `<div class="card-memo">${esc(c.memo)}</div>` : ""}
       ${c.addedBy ? `<div class="card-by">${esc(c.addedBy)} 님이 추가</div>` : ""}
-      <div class="actions">
-        <button class="btn main" data-act="near">${M().nearBtn}</button>
-        <button class="btn" data-act="park">🅿️ 주차장</button>
-        <button class="btn naver" data-act="naver">N 지도</button>
-        <button class="btn" data-act="visit">${c.visited ? "↩ 안 가봤어요" : "✓ 가봤어요"}</button>
-        <button class="btn" data-act="edit">수정</button>
+      <div class="actions one">
+        <button class="btn main sm" data-act="near">${M().nearBtn}</button>
+        <button class="btn sm" data-act="park">🅿️ 주차장</button>
+        <button class="btn naver sm" data-act="naver">N 지도</button>
+        <button class="btn sm" data-act="edit">수정</button>
       </div>`; })()}
     </div>`).join("");
 }
@@ -768,15 +774,14 @@ function groupCard(k, g, distTag) {
       </div>
       <div class="branches">${items.map((c, i) => `
         <div class="branch ${c.visited && !allV ? "visited" : ""}" data-id="${esc(c.id)}">
-          <div class="branch-name">– ${esc(branchOf(c))}${distTag(c)}${c.visited ? `<span class="badge">가봤어요</span>` : ""}</div>
+          <div class="branch-name">– ${esc(branchOf(c))}${distTag(c)}<button class="visit-toggle ${c.visited ? "on" : ""}" data-act="visit" aria-pressed="${c.visited}">${c.visited ? "✓ 가봤어요" : "안 가봤어요"}</button></div>
           ${c.address ? `<div class="card-addr">${esc(c.address)}</div>` : ""}
           ${tagsHtml(c)}
           ${c.memo ? `<div class="card-memo">${esc(c.memo)}</div>` : ""}
-          <div class="actions">
+          <div class="actions one">
             <button class="btn main sm" data-act="near">${M().nearBtn}</button>
-            <button class="btn sm park-btn" data-act="park" aria-label="근처 주차장">🅿️</button>
+            <button class="btn sm" data-act="park">🅿️ 주차장</button>
             <button class="btn naver sm" data-act="naver">N 지도</button>
-            <button class="btn sm" data-act="visit">${c.visited ? "↩ 안 가봤어요" : "✓ 가봤어요"}</button>
             ${i === items.length - 1 ? `<button class="btn sm" data-act="gedit">수정</button>` : ""}
           </div>
         </div>`).join("")}

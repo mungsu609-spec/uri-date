@@ -136,6 +136,23 @@ header h1 { font-size: 22px; margin: 0; flex: 1; }
 .card-name { font-weight: 700; font-size: 17px; flex: 1; word-break: keep-all; }
 .badge { font-size: 12px; padding: 3px 9px; border-radius: 999px; background: var(--done-soft); color: var(--done); white-space: nowrap; }
 .card-addr { color: var(--sub); font-size: 13px; margin-top: 2px; }
+/* 체인점 카드: 브랜드 이름 아래에 지점들을 줄줄이 */
+.branch-count { font-size: 12px; font-weight: 600; color: var(--sub); margin-left: 4px; white-space: nowrap; }
+.branches { margin-top: 8px; }
+.branch { padding: 9px 0 9px 2px; border-top: 1px solid var(--line); }
+.branch-name { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-weight: 600; font-size: 15px; }
+.branch .actions { margin-top: 6px; }
+.btn.sm { padding: 6px 10px; font-size: 13px; border-radius: 10px; }
+/* 검색 결과 여러 개 고르기 */
+.result.sel { background: var(--accent-soft); box-shadow: inset 0 0 0 2px var(--accent); }
+.sel-mark {
+  flex: none; width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid #c9b8b4;
+  display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; color: #fff;
+}
+.result.sel .sel-mark { background: var(--accent); border-color: var(--accent); }
+.result.sel .sel-mark::after { content: "✓"; }
+.add-bar { position: sticky; bottom: 0; padding: 8px 0; background: var(--bg); z-index: 1; }
+.add-bar .full { margin-top: 0; }
 .card-memo { font-size: 14px; margin-top: 6px; white-space: pre-wrap; }
 .card-by { color: var(--sub); font-size: 12px; margin-top: 6px; }
 .actions { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
@@ -494,6 +511,7 @@ let ratings = {};       // 카카오 장소 id → { name, rating: "good" | "bad
 let nearRedraw = null;  // 근처 맛집 창이 열려 있으면 평가가 바뀔 때 다시 그림
 let ratedRedraw = null; // 평가한 곳 창이 열려 있으면 평가가 바뀔 때 다시 그림
 let filter = "all";
+let groupMap = new Map(); // 리스트에 그린 카드들: 체인 이름(또는 "#id") → { brand, items }
 let view = "home";      // 지금 보이는 화면: home / cafe / food (cafe·food는 같은 리스트 화면)
 // 홈 프로필 사진: 평가 목록(ratings) 안에 "_profile"이라는 특별한 칸으로 저장해서 둘 다 같은 사진을 봐요
 // (Firebase 규칙을 바꾸지 않아도 되게 이미 허락된 목록을 같이 써요)
@@ -598,11 +616,21 @@ function render() {
     list.innerHTML = `<div class="empty">${filter === "done" ? "아직 가 본 곳이 없어요." : `모두 가 봤어요! 새 ${M().noun}${josa(M().noun, "을", "를")} 추가해 보세요.`}</div>`;
     return;
   }
-  list.innerHTML = shown.map((c) => `
-    <div class="card ${c.visited ? "visited" : ""}" data-id="${esc(c.id)}">
+  // 같은 체인 지점끼리 카드 하나로 묶어요 (정렬했을 때 먼저 나온 지점 자리에)
+  groupMap = new Map();
+  shown.forEach((c) => {
+    const b = brandOf(c);
+    const k = b ? norm(b) : "#" + c.id;
+    if (!groupMap.has(k)) groupMap.set(k, { brand: b, items: [] });
+    groupMap.get(k).items.push(c);
+  });
+  const distTag = (c) => (distBase() ? `<span class="card-dist">${distFrom(c) == null ? "거리 모름" : "📍 " + fmtDist(distFrom(c))}</span>` : "");
+  list.innerHTML = [...groupMap].map(([k, g]) => g.items.length > 1 ? groupCard(k, g, distTag) : `
+    <div class="card ${g.items[0].visited ? "visited" : ""}" data-id="${esc(g.items[0].id)}">
+      ${(() => { const c = g.items[0]; return `
       <div class="card-top">
         <div class="card-name">${esc(c.name)}</div>
-        ${distBase() ? `<span class="card-dist">${distFrom(c) == null ? "거리 모름" : "📍 " + fmtDist(distFrom(c))}</span>` : ""}
+        ${distTag(c)}
         ${c.visited ? `<span class="badge">가봤어요</span>` : ""}
       </div>
       ${c.address ? `<div class="card-addr">${esc(c.address)}</div>` : ""}
@@ -614,16 +642,58 @@ function render() {
         <button class="btn naver" data-act="naver">N 지도</button>
         <button class="btn" data-act="visit">${c.visited ? "↩ 안 가봤어요" : "✓ 가봤어요"}</button>
         <button class="btn" data-act="edit">수정</button>
-      </div>
+      </div>`; })()}
     </div>`).join("");
 }
 
-$("#list").addEventListener("click", (e) => {
+// 체인점 카드: 브랜드 이름 + 지점마다 (– 지점: 주소, 근처·N 지도), 가봤어요·수정은 지점 전체에
+function groupCard(k, g, distTag) {
+  const items = g.items;
+  const allV = items.every((c) => c.visited);
+  const tagUnion = Object.fromEntries(M().tags.map((t) => [t.key, items.some((c) => c[t.key])]));
+  const memos = [...new Set(items.map((c) => c.memo).filter(Boolean))];
+  const by = [...new Set(items.map((c) => c.addedBy).filter(Boolean))].join(", ");
+  return `
+    <div class="card ${allV ? "visited" : ""}" data-group="${esc(k)}">
+      <div class="card-top">
+        <div class="card-name">${esc(g.brand)}<span class="branch-count">지점 ${items.length}</span></div>
+        ${allV ? `<span class="badge">가봤어요</span>` : ""}
+      </div>
+      ${tagsHtml(tagUnion)}
+      ${memos.map((m) => `<div class="card-memo">${esc(m)}</div>`).join("")}
+      <div class="branches">${items.map((c) => `
+        <div class="branch" data-id="${esc(c.id)}">
+          <div class="branch-name">– ${esc(branchOf(c))}${distTag(c)}${c.visited && !allV ? `<span class="badge">가봤어요</span>` : ""}</div>
+          ${c.address ? `<div class="card-addr">${esc(c.address)}</div>` : ""}
+          <div class="actions">
+            <button class="btn main sm" data-act="near">${M().nearBtn}</button>
+            <button class="btn naver sm" data-act="naver">N 지도</button>
+          </div>
+        </div>`).join("")}
+      </div>
+      ${by ? `<div class="card-by">${esc(by)} 님이 추가</div>` : ""}
+      <div class="actions">
+        <button class="btn" data-act="gvisit">${allV ? "↩ 안 가봤어요" : "✓ 가봤어요"}</button>
+        <button class="btn" data-act="gedit">수정</button>
+      </div>
+    </div>`;
+}
+
+$("#list").addEventListener("click", async (e) => {
   const b = e.target.closest("button[data-act]");
   if (!b) return;
-  const cafe = cafes.find((c) => c.id === b.closest(".card").dataset.id);
-  if (!cafe) return;
   const act = b.dataset.act;
+  if (act === "gvisit" || act === "gedit") {
+    const g = groupMap.get(b.closest(".card").dataset.group);
+    if (!g) return;
+    if (act === "gedit") return openGroupEdit(g.brand, g.items);
+    const allV = g.items.every((c) => c.visited);
+    try { await Promise.all(g.items.map((c) => store.update(c.id, { visited: !allV }))); }
+    catch (err) { console.error(err); toast("저장하지 못했어요"); }
+    return;
+  }
+  const cafe = cafes.find((c) => c.id === b.closest("[data-id]").dataset.id);
+  if (!cafe) return;
   if (act === "near") openNearby(cafe, M().near);
   if (act === "naver") openNaver(cafe.name + " " + regionOf(cafe.address), cafe.naverUrl);
   if (act === "visit") store.update(cafe.id, { visited: !cafe.visited });
@@ -731,6 +801,30 @@ function findDuplicate(cafe, list = cafes) {
   });
 }
 
+// ---------- 체인점 묶기 ----------
+// "스타벅스 부산대정문점" → 체인 스타벅스 / 지점 부산대정문점
+// 이름만 보고: 마지막 낱말이 "…점"이면 그 앞이 체인 이름 (예: 자스민커피 부산대정문2호점)
+function splitName(name) {
+  const w = String(name || "").trim().split(/\s+/);
+  const last = w[w.length - 1];
+  return w.length >= 2 && last.length >= 2 && last.endsWith("점") ? { brand: w.slice(0, -1).join(" "), branch: last } : null;
+}
+// 카카오 장소: 분류 끝이 체인 이름이면 그걸로 (예: 음식점 > 카페 > 커피전문점 > 스타벅스), 아니면 이름만 보고
+function kakaoBrand(p) {
+  const parts = p.category_name.split(" > ").map((s) => s.trim());
+  const w = p.place_name.trim().split(/\s+/);
+  if (parts.length >= 3 && w.length >= 2 && norm(w[0]).endsWith(norm(parts[parts.length - 1]))) return { brand: w[0], branch: w.slice(1).join(" ") };
+  return splitName(p.place_name);
+}
+const brandOf = (c) => c.brand || (splitName(c.name) || {}).brand || null;
+function branchOf(c) {
+  if (c.branch) return c.branch;
+  const b = brandOf(c);
+  return b && c.name.startsWith(b) ? c.name.slice(b.length).trim() || c.name : c.name;
+}
+const placeFromKakao = (p) => ({ name: p.place_name, address: p.road_address_name || p.address_name, x: p.x, y: p.y, kakaoId: p.id, ...(kakaoBrand(p) || {}) });
+
+// 검색 결과는 눌러서 여러 곳을 고른 뒤 한 번에 추가해요 (체인점 여러 지점을 한꺼번에)
 function searchCafe(query) {
   const box = $("#qResults");
   if (!query) return;
@@ -740,36 +834,57 @@ function searchCafe(query) {
       box.innerHTML = `<div class="msg">검색 결과가 없어요. 이름을 바꿔 보거나 직접 입력해 주세요.</div>`;
       return;
     }
-    box.innerHTML = data.map((p, i) => `
+    const sel = new Set();
+    const dupOf = (p) => findDuplicate({ name: p.place_name, address: p.road_address_name || p.address_name, kakaoId: p.id });
+    box.innerHTML = `<div class="hint" style="margin:0 0 8px">추가할 곳을 눌러 골라요. 체인점은 여러 지점을 한 번에 골라도 돼요.</div>` + data.map((p, i) => `
       <button class="result" data-i="${i}">
         <div class="result-main">
-          <div class="result-name">${esc(p.place_name)}${findDuplicate({ name: p.place_name, address: p.road_address_name || p.address_name, kakaoId: p.id }) ? `<span class="good-badge">이미 저장됨</span>` : ""}</div>
+          <div class="result-name">${esc(p.place_name)}${dupOf(p) ? `<span class="good-badge">이미 저장됨</span>` : ""}</div>
           <div class="result-sub">${esc(p.road_address_name || p.address_name)} · ${esc(p.category_name.split(" > ").pop())}</div>
         </div>
-      </button>`).join("");
+        ${dupOf(p) ? "" : `<span class="sel-mark"></span>`}
+      </button>`).join("") + `<div class="add-bar" id="qAddBar" hidden><button class="btn main full" id="qAdd"></button></div>`;
+    const bar = () => {
+      $("#qAddBar").hidden = !sel.size;
+      $("#qAdd").textContent = `선택한 ${sel.size}곳 추가`;
+    };
     box.onclick = (e) => {
+      if (e.target.id === "qAdd") return addPicked();
       const r = e.target.closest(".result");
       if (!r) return;
-      const p = data[+r.dataset.i];
-      const cafe = { name: p.place_name, address: p.road_address_name || p.address_name, x: p.x, y: p.y, kakaoId: p.id };
-      // 맛집이면 카카오 분류를 보고 한식·중식·일식·분식·양식·고기·술집을 미리 체크해 둬요
-      if (mode === "food") foodAutoTags(p.category_name).forEach((k) => { cafe[k] = true; });
-      const dup = findDuplicate(cafe);
+      const i = +r.dataset.i;
+      const dup = dupOf(data[i]);
       if (dup) return toast(`'${dup.name}'은(는) 이미 저장한 ${M().noun}${josa(M().noun, "이에요", "예요")}`);
+      sel.has(i) ? sel.delete(i) : sel.add(i);
+      r.classList.toggle("sel", sel.has(i));
+      bar();
+    };
+    function addPicked() {
+      const picked = [...sel].sort((a, b) => a - b).map((i) => data[i]);
+      const list = picked.map(placeFromKakao);
+      // 맛집이면 카카오 분류를 보고 한식·중식·일식·분식·양식·고기·술집을 미리 체크해 둬요
+      const auto = mode === "food" ? [...new Set(picked.flatMap((p) => foodAutoTags(p.category_name)))] : [];
+      const cafe = list.length === 1 ? list[0] : { multi: list };
+      auto.forEach((k) => { cafe[k] = true; });
       box.innerHTML = "";
       showForm(cafe);
-    };
+    }
   });
 }
 
 function showForm(cafe, editing = false) {
+  const multi = cafe.multi;
+  const sameBrand = multi && multi.every((p) => p.brand && norm(p.brand) === norm(multi[0].brand)) ? multi[0].brand : null;
   $("#form").innerHTML = `
-    ${cafe.x ? `<div class="picked" style="margin-top:12px"><b>${esc(cafe.name)}</b><div class="result-sub">${esc(cafe.address)}</div></div>` : `
+    ${multi ? `<div class="picked" style="margin-top:12px"><b>${esc(sameBrand || `선택한 ${multi.length}곳`)}</b>${multi.map((p) => `
+      <div class="result-sub" style="white-space:normal">– <b>${esc(sameBrand ? p.branch : p.name)}</b>: ${esc(p.address)}</div>`).join("")}</div>`
+    : cafe.x ? `<div class="picked" style="margin-top:12px"><b>${esc(cafe.name)}</b><div class="result-sub">${esc(cafe.address)}</div></div>` : `
       <label>${M().noun} 이름</label><input type="text" id="fName" value="${esc(cafe.name)}">
       <label>주소 또는 동네 (선택)</label><input type="text" id="fAddr" value="${esc(cafe.address)}" placeholder="예: 서울 마포구 연남동">`}
+    ${multi ? `<div class="hint">특징·메모는 ${multi.length}곳 모두에 똑같이 들어가요. 지점별 네이버지도 링크는 저장한 뒤 지점 수정에서 넣을 수 있어요.</div>` : `
     <label>네이버지도 링크 (선택)</label>
     <input type="url" id="fNaver" value="${esc(cafe.naverUrl)}" placeholder="https://naver.me/...">
-    <div class="hint">네이버지도에서 ${M().noun} → 공유 → 링크 복사 후 붙여 넣으면, 누를 때 그 ${M().noun}${josa(M().noun, "이", "가")} 바로 열려요.</div>
+    <div class="hint">네이버지도에서 ${M().noun} → 공유 → 링크 복사 후 붙여 넣으면, 누를 때 그 ${M().noun}${josa(M().noun, "이", "가")} 바로 열려요.</div>`}
     <label>특징 (선택, 여러 개 골라도 돼요)</label>
     <div class="checks ${M().tags.length > 6 ? "many" : ""}">${checkRows(M().tags.map((t) => `
       <label class="check" data-k="${t.key}"><input type="checkbox" id="f_${t.key}" ${cafe[t.key] ? "checked" : ""}>${checkLabel(t)}</label>`))}
@@ -779,6 +894,21 @@ function showForm(cafe, editing = false) {
     <button class="btn main full" id="fSave">${editing ? "수정 저장" : "저장"}</button>
     ${editing ? `<button class="btn full" id="fDel" style="color:#d04848">삭제</button>` : ""}`;
   $("#fSave").onclick = async () => {
+    const common = {
+      memo: $("#fMemo").value.trim(),
+      ...Object.fromEntries(M().tags.map((t) => [t.key, $("#f_" + t.key).checked])),
+    };
+    if (multi) {
+      // 고른 지점마다 하나씩 저장 (이미 저장된 곳은 건너뛰어요)
+      const fresh = multi.filter((p) => !findDuplicate(p));
+      try {
+        await Promise.all(fresh.map((p) => store.add({ ...common, name: p.name, address: p.address, naverUrl: "", kind: mode,
+          x: p.x || null, y: p.y || null, kakaoId: p.kakaoId || null, brand: p.brand || null, branch: p.branch || null, visited: false, addedBy: me || "" })));
+        closeSheet();
+        toast(`${fresh.length}곳 저장했어요`);
+      } catch (err) { console.error(err); toast("저장하지 못했어요"); }
+      return;
+    }
     const name = cafe.x ? cafe.name : $("#fName").value.trim();
     if (!name) return toast(`${M().noun} 이름을 적어 주세요`);
     if (!editing) {
@@ -794,7 +924,8 @@ function showForm(cafe, editing = false) {
     };
     try {
       if (editing) await store.update(cafe.id, data);
-      else await store.add({ ...data, kind: mode, x: cafe.x || null, y: cafe.y || null, kakaoId: cafe.kakaoId || null, visited: false, addedBy: me || "" });
+      else await store.add({ ...data, kind: mode, x: cafe.x || null, y: cafe.y || null, kakaoId: cafe.kakaoId || null,
+        brand: cafe.brand || null, branch: cafe.branch || null, visited: false, addedBy: me || "" });
       closeSheet();
       toast(editing ? "수정했어요" : "저장했어요");
     } catch (err) { console.error(err); toast("저장하지 못했어요"); }
@@ -810,6 +941,47 @@ function showForm(cafe, editing = false) {
 function openEdit(cafe) {
   openSheet(`<h2><span>${M().noun} 수정</span><button class="close">✕</button></h2><div id="form"></div>`);
   showForm(cafe, true);
+}
+
+// 체인점 카드 수정: 특징·메모는 지점 전체에, 지점마다 따로 수정·삭제도 돼요
+function openGroupEdit(brand, items) {
+  const memos = [...new Set(items.map((c) => c.memo).filter(Boolean))];
+  openSheet(`
+    <h2><span>${esc(brand)} 수정</span><button class="close">✕</button></h2>
+    <div class="hint">특징·메모는 지점 ${items.length}곳 모두에 똑같이 들어가요</div>
+    <label>특징 (선택, 여러 개 골라도 돼요)</label>
+    <div class="checks ${M().tags.length > 6 ? "many" : ""}">${checkRows(M().tags.map((t) => `
+      <label class="check" data-k="${t.key}"><input type="checkbox" id="f_${t.key}" ${items.some((c) => c[t.key]) ? "checked" : ""}>${checkLabel(t)}</label>`))}
+    </div>
+    <label>메모 (선택)</label>
+    <textarea id="fMemo" placeholder="${M().memoPh}">${esc(memos.join("\n"))}</textarea>
+    <button class="btn main full" id="gSave">수정 저장</button>
+    <label style="margin-top:20px">지점 (지점마다 네이버지도 링크 넣기·삭제)</label>
+    <div id="gBranches">${items.map((c) => `
+      <div class="rated"><span><b>${esc(branchOf(c))}</b><small>${esc(c.address)}</small></span>
+        <button class="btn" data-edit="${esc(c.id)}">수정</button><button class="btn" data-del="${esc(c.id)}" style="color:#d04848">삭제</button></div>`).join("")}
+    </div>
+    <button class="btn full" id="gDelAll" style="color:#d04848">지점 모두 삭제</button>`);
+  $("#gSave").onclick = async () => {
+    const data = { memo: $("#fMemo").value.trim(), ...Object.fromEntries(M().tags.map((t) => [t.key, $("#f_" + t.key).checked])) };
+    try { await Promise.all(items.map((c) => store.update(c.id, data))); closeSheet(); toast("수정했어요"); }
+    catch (err) { console.error(err); toast("저장하지 못했어요"); }
+  };
+  $("#gBranches").onclick = async (e) => {
+    const ed = e.target.closest("[data-edit]"), del = e.target.closest("[data-del]");
+    const id = ed ? ed.dataset.edit : del ? del.dataset.del : null;
+    const c = items.find((x) => x.id === id);
+    if (!c) return;
+    if (ed) return openEdit(c);
+    if (!confirm(`'${c.name}'을(를) 지울까요?`)) return;
+    try { await store.remove(c.id); closeSheet(); toast("지웠어요"); }
+    catch (err) { console.error(err); toast("지우지 못했어요"); }
+  };
+  $("#gDelAll").onclick = async () => {
+    if (!confirm(`${brand} 지점 ${items.length}곳을 모두 지울까요?`)) return;
+    try { await Promise.all(items.map((c) => store.remove(c.id))); closeSheet(); toast("지웠어요"); }
+    catch (err) { console.error(err); toast("지우지 못했어요"); }
+  };
 }
 
 // ---------- 근처 맛집 / 근처 카페 ----------
@@ -957,6 +1129,7 @@ async function openNearby(cafe, target = "food") {
       name: p.place_name, address: p.road_address_name || p.address_name, naverUrl: "", memo: "",
       ...Object.fromEntries(MODES[target].tags.map((t) => [t.key, auto.includes(t.key)])),
       kind: target, x: p.x || null, y: p.y || null, kakaoId: p.id || null, visited: false, addedBy: me || "",
+      brand: null, branch: null, ...(kakaoBrand(p) || {}),
     });
     p.saved = true;
     draw();
@@ -1125,9 +1298,11 @@ function jumpTo(c) {
     document.querySelectorAll("#filters .chip").forEach((x) => x.classList.toggle("on", x.dataset.f === "all"));
     render();
   }
-  const card = document.querySelector(`#list .card[data-id="${CSS.escape(c.id)}"]`);
-  if (!card) return;
-  card.scrollIntoView({ block: "center" });
+  // 체인점이면 묶음 카드 안의 그 지점 줄로 가요
+  const row = document.querySelector(`#list [data-id="${CSS.escape(c.id)}"]`);
+  if (!row) return;
+  const card = row.closest(".card");
+  row.scrollIntoView({ block: "center" });
   card.classList.remove("flash"); void card.offsetWidth; card.classList.add("flash");
 }
 

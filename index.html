@@ -55,7 +55,19 @@ button { cursor: pointer; border: 0; background: none; }
 
 header { padding: 18px 0 10px; display: flex; align-items: center; gap: 10px; }
 header h1 { font-size: 22px; margin: 0; flex: 1; }
-.icon-btn { width: 40px; height: 40px; border-radius: 12px; background: var(--card); box-shadow: var(--shadow); font-size: 18px; }
+.back-btn { flex: none; height: 40px; padding: 0 14px 0 10px; border-radius: 12px; background: var(--card); box-shadow: var(--shadow); font-size: 16px; font-weight: 600; color: var(--accent); }
+
+/* 홈 메뉴 */
+.menu { display: flex; flex-direction: column; gap: 12px; margin-top: 6px; }
+.menu-item {
+  display: flex; align-items: center; gap: 14px; width: 100%; padding: 18px 16px; text-align: left;
+  background: var(--card); border-radius: 18px; box-shadow: var(--shadow);
+}
+.menu-emoji { font-size: 30px; flex: none; }
+.menu-text { flex: 1; min-width: 0; }
+.menu-text b { display: block; font-size: 18px; }
+.menu-text small { display: block; font-size: 13px; color: var(--sub); margin-top: 2px; }
+.menu-arrow { font-size: 26px; color: var(--sub); flex: none; }
 
 .banner { background: var(--accent-soft); border-radius: 14px; padding: 10px 14px; font-size: 14px; margin-bottom: 12px; }
 .banner b { color: var(--accent); }
@@ -168,10 +180,42 @@ textarea { min-height: 70px; resize: vertical; }
 </style>
 </head>
 <body>
-<div class="wrap">
+<!-- 홈: 앱을 열면 가장 먼저 보이는 화면 -->
+<div class="wrap" id="homeView">
+  <header><h1>💕 병가 데이트</h1></header>
+  <div class="menu">
+    <button class="menu-item" data-go="cafe">
+      <span class="menu-emoji">☕</span>
+      <span class="menu-text"><b>병가 카페 데이트</b><small>카페 리스트 · 뽑기 · 근처 맛집</small></span>
+      <span class="menu-arrow">›</span>
+    </button>
+    <button class="menu-item" data-go="food">
+      <span class="menu-emoji">🍽</span>
+      <span class="menu-text"><b>병가 맛집 데이트</b><small>준비 중이에요</small></span>
+      <span class="menu-arrow">›</span>
+    </button>
+    <button class="menu-item" id="btnSettings">
+      <span class="menu-emoji">⚙️</span>
+      <span class="menu-text"><b>환경 설정</b><small>내 이름 · 커플 코드 · 평가한 맛집</small></span>
+      <span class="menu-arrow">›</span>
+    </button>
+  </div>
+</div>
+
+<!-- 병가 맛집 데이트 (아직 준비 중) -->
+<div class="wrap" id="foodView" hidden>
   <header>
+    <button class="back-btn" data-go="home">‹ 홈</button>
+    <h1>🍽 병가 맛집 데이트</h1>
+  </header>
+  <div class="empty">🍳<br>준비 중이에요.<br>곧 만들어 둘게요!</div>
+</div>
+
+<!-- 병가 카페 데이트 -->
+<div class="wrap" id="cafeView" hidden>
+  <header>
+    <button class="back-btn" data-go="home">‹ 홈</button>
     <h1>☕ 병가 카페 데이트</h1>
-    <button class="icon-btn" id="btnSettings" aria-label="설정">⚙️</button>
   </header>
   <div id="banner"></div>
   <div class="picks">
@@ -199,8 +243,8 @@ textarea { min-height: 70px; resize: vertical; }
   </div>
   <div class="hint" id="distHint" style="display:none;margin:-4px 0 10px"></div>
   <div id="list"></div>
+  <button class="fab" id="btnAdd">＋ 카페 추가</button>
 </div>
-<button class="fab" id="btnAdd">＋ 카페 추가</button>
 
 <div class="sheet-bg" id="sheetBg"><div class="sheet" id="sheet"></div></div>
 <div class="toast" id="toast"></div>
@@ -335,6 +379,7 @@ let rstore = null;      // 맛집 평가 저장소
 let ratings = {};       // 카카오 장소 id → { name, rating: "good" | "bad", by }
 let nearRedraw = null;  // 근처 맛집 창이 열려 있으면 평가가 바뀔 때 다시 그림
 let filter = "all";
+let view = "home";      // 지금 보이는 화면: home / cafe / food
 
 // ---------- 정렬 (가나다순 / 추가순 / 거리순 / 내 위치순) ----------
 // 거리순 기준: 부산 금정구 금강로 431 (구서백리명가에덴)
@@ -449,7 +494,6 @@ function locate(fallback, keepOld = false) {
 }
 
 markSort();
-if (sortBy === "near") locate("name");
 let prevSort = sortBy;
 $("#sortSel").addEventListener("change", (e) => {
   const v = e.target.value;
@@ -459,7 +503,7 @@ $("#sortSel").addEventListener("change", (e) => {
 });
 $("#distHint").addEventListener("click", (e) => { if (e.target.id === "relocate") locate("name", true); });
 // 앱을 다시 열면 그사이 이동했을 수 있으니 위치를 새로 찾아요
-document.addEventListener("visibilitychange", () => { if (!document.hidden && sortBy === "near" && !locating) locate("name", true); });
+document.addEventListener("visibilitychange", () => { if (!document.hidden && view === "cafe" && sortBy === "near" && !locating) locate("name", true); });
 
 $("#filters").addEventListener("click", (e) => {
   const b = e.target.closest(".chip");
@@ -817,6 +861,19 @@ function openSettings(first = false) {
     closeSheet();
   };
 }
+
+// ---------- 화면 바꾸기 (홈 ↔ 카페 데이트 / 맛집 데이트) ----------
+function go(v) {
+  view = v;
+  ["home", "cafe", "food"].forEach((n) => { $(`#${n}View`).hidden = n !== v; });
+  window.scrollTo(0, 0);
+  // 내 위치순이면 카페 데이트에 들어올 때 위치를 새로 찾아요
+  if (v === "cafe" && sortBy === "near" && !locating) locate("name", true);
+}
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-go]");
+  if (b) go(b.dataset.go);
+});
 
 // ---------- 시작 ----------
 async function start() {

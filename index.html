@@ -141,8 +141,12 @@ header h1 { font-size: 22px; margin: 0; flex: 1; }
 .branches { margin-top: 8px; }
 .branch { padding: 9px 0 9px 2px; border-top: 1px solid var(--line); }
 .branch-name { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-weight: 600; font-size: 15px; }
-.branch .actions { margin-top: 6px; }
-.btn.sm { padding: 6px 10px; font-size: 13px; border-radius: 10px; }
+.branch .actions { margin-top: 6px; gap: 5px; }
+.branch.visited { opacity: .7; }
+/* 지점마다 따로 쓰는 칸 (여러 지점 추가·체인 수정 창) */
+.branch-form { background: var(--card); border-radius: 14px; padding: 12px 12px 14px; margin-top: 10px; box-shadow: var(--shadow); }
+.branch-form label:first-of-type { margin-top: 8px; }
+.btn.sm { padding: 6px 8px; font-size: 13px; border-radius: 10px; }
 /* 검색 결과 여러 개 고르기 */
 .result.sel { background: var(--accent-soft); box-shadow: inset 0 0 0 2px var(--accent); }
 .sel-mark {
@@ -647,50 +651,41 @@ function render() {
 }
 
 // 체인점 카드: 브랜드 이름 + 지점마다 (– 지점: 주소, 근처·N 지도), 가봤어요·수정은 지점 전체에
+// 특징·메모·가봤어요는 지점마다 따로. 수정 버튼은 마지막 지점 줄에만 (누르면 지점 전체를 한 화면에서 고쳐요)
 function groupCard(k, g, distTag) {
   const items = g.items;
   const allV = items.every((c) => c.visited);
-  const tagUnion = Object.fromEntries(M().tags.map((t) => [t.key, items.some((c) => c[t.key])]));
-  const memos = [...new Set(items.map((c) => c.memo).filter(Boolean))];
   const by = [...new Set(items.map((c) => c.addedBy).filter(Boolean))].join(", ");
   return `
     <div class="card ${allV ? "visited" : ""}" data-group="${esc(k)}">
       <div class="card-top">
         <div class="card-name">${esc(g.brand)}<span class="branch-count">지점 ${items.length}</span></div>
-        ${allV ? `<span class="badge">가봤어요</span>` : ""}
       </div>
-      ${tagsHtml(tagUnion)}
-      ${memos.map((m) => `<div class="card-memo">${esc(m)}</div>`).join("")}
-      <div class="branches">${items.map((c) => `
-        <div class="branch" data-id="${esc(c.id)}">
-          <div class="branch-name">– ${esc(branchOf(c))}${distTag(c)}${c.visited && !allV ? `<span class="badge">가봤어요</span>` : ""}</div>
+      <div class="branches">${items.map((c, i) => `
+        <div class="branch ${c.visited && !allV ? "visited" : ""}" data-id="${esc(c.id)}">
+          <div class="branch-name">– ${esc(branchOf(c))}${distTag(c)}${c.visited ? `<span class="badge">가봤어요</span>` : ""}</div>
           ${c.address ? `<div class="card-addr">${esc(c.address)}</div>` : ""}
+          ${tagsHtml(c)}
+          ${c.memo ? `<div class="card-memo">${esc(c.memo)}</div>` : ""}
           <div class="actions">
             <button class="btn main sm" data-act="near">${M().nearBtn}</button>
             <button class="btn naver sm" data-act="naver">N 지도</button>
+            <button class="btn sm" data-act="visit">${c.visited ? "↩ 안 가봤어요" : "✓ 가봤어요"}</button>
+            ${i === items.length - 1 ? `<button class="btn sm" data-act="gedit">수정</button>` : ""}
           </div>
         </div>`).join("")}
       </div>
       ${by ? `<div class="card-by">${esc(by)} 님이 추가</div>` : ""}
-      <div class="actions">
-        <button class="btn" data-act="gvisit">${allV ? "↩ 안 가봤어요" : "✓ 가봤어요"}</button>
-        <button class="btn" data-act="gedit">수정</button>
-      </div>
     </div>`;
 }
 
-$("#list").addEventListener("click", async (e) => {
+$("#list").addEventListener("click", (e) => {
   const b = e.target.closest("button[data-act]");
   if (!b) return;
   const act = b.dataset.act;
-  if (act === "gvisit" || act === "gedit") {
+  if (act === "gedit") {
     const g = groupMap.get(b.closest(".card").dataset.group);
-    if (!g) return;
-    if (act === "gedit") return openGroupEdit(g.brand, g.items);
-    const allV = g.items.every((c) => c.visited);
-    try { await Promise.all(g.items.map((c) => store.update(c.id, { visited: !allV }))); }
-    catch (err) { console.error(err); toast("저장하지 못했어요"); }
-    return;
+    return g && openGroupEdit(g.brand, g.items);
   }
   const cafe = cafes.find((c) => c.id === b.closest("[data-id]").dataset.id);
   if (!cafe) return;
@@ -861,30 +856,70 @@ function searchCafe(query) {
     };
     function addPicked() {
       const picked = [...sel].sort((a, b) => a - b).map((i) => data[i]);
-      const list = picked.map(placeFromKakao);
-      // 맛집이면 카카오 분류를 보고 한식·중식·일식·분식·양식·고기·술집을 미리 체크해 둬요
-      const auto = mode === "food" ? [...new Set(picked.flatMap((p) => foodAutoTags(p.category_name)))] : [];
+      // 맛집이면 카카오 분류를 보고 한식·중식·일식·분식·양식·고기·술집을 지점마다 미리 체크해 둬요
+      const list = picked.map((p) => {
+        const c = placeFromKakao(p);
+        if (mode === "food") foodAutoTags(p.category_name).forEach((k) => { c[k] = true; });
+        return c;
+      });
       const cafe = list.length === 1 ? list[0] : { multi: list };
-      auto.forEach((k) => { cafe[k] = true; });
       box.innerHTML = "";
       showForm(cafe);
     }
   });
 }
 
+// 지점 하나의 특징·메모(·네이버지도 링크) 칸. 여러 지점 추가와 체인 수정 창에서 지점마다 하나씩 써요
+function branchBlock(i, title, c, { naver = false, del = null } = {}) {
+  return `
+    <div class="branch-form" data-i="${i}">
+      <div class="branch-name">– ${esc(title)}</div>
+      ${c.address ? `<div class="card-addr">${esc(c.address)}</div>` : ""}
+      <label>특징 (선택)</label>
+      <div class="checks ${M().tags.length > 6 ? "many" : ""}">${checkRows(M().tags.map((t) => `
+        <label class="check" data-k="${t.key}"><input type="checkbox" id="b${i}_${t.key}" ${c[t.key] ? "checked" : ""}>${checkLabel(t)}</label>`))}
+      </div>
+      <label>메모 (선택)</label>
+      <textarea id="b${i}_memo" placeholder="${M().memoPh}">${esc(c.memo)}</textarea>
+      ${naver ? `<label>네이버지도 링크 (선택)</label><input type="url" id="b${i}_naver" value="${esc(c.naverUrl)}" placeholder="https://naver.me/...">` : ""}
+      ${del ? `<button class="btn full" data-del="${esc(del)}" style="color:#d04848;margin-top:10px">이 지점 삭제</button>` : ""}
+    </div>`;
+}
+const readBranch = (i, naver = false) => ({
+  memo: $(`#b${i}_memo`).value.trim(),
+  ...Object.fromEntries(M().tags.map((t) => [t.key, $(`#b${i}_${t.key}`).checked])),
+  ...(naver ? { naverUrl: $(`#b${i}_naver`).value.trim() } : {}),
+});
+
 function showForm(cafe, editing = false) {
   const multi = cafe.multi;
-  const sameBrand = multi && multi.every((p) => p.brand && norm(p.brand) === norm(multi[0].brand)) ? multi[0].brand : null;
+  if (multi) {
+    // 여러 곳을 한 번에: 지점마다 특징·메모를 따로 써요
+    const sameBrand = multi.every((p) => p.brand && norm(p.brand) === norm(multi[0].brand)) ? multi[0].brand : null;
+    $("#form").innerHTML = `
+      <h2 style="margin-top:14px"><span>${esc(sameBrand || `선택한 ${multi.length}곳`)}${sameBrand ? `<span class="branch-count">지점 ${multi.length}</span>` : ""}</span></h2>
+      <div class="hint">특징·메모는 지점마다 따로 써요. 네이버지도 링크는 저장한 뒤 수정에서 넣을 수 있어요.</div>
+      ${multi.map((p, i) => branchBlock(i, sameBrand ? p.branch : p.name, p)).join("")}
+      <button class="btn main full" id="fSave">${multi.length}곳 저장</button>`;
+    $("#fSave").onclick = async () => {
+      // 고른 지점마다 하나씩 저장 (이미 저장된 곳은 건너뛰어요)
+      const fresh = multi.map((p, i) => ({ p, data: readBranch(i) })).filter(({ p }) => !findDuplicate(p));
+      try {
+        await Promise.all(fresh.map(({ p, data }) => store.add({ ...data, name: p.name, address: p.address, naverUrl: "", kind: mode,
+          x: p.x || null, y: p.y || null, kakaoId: p.kakaoId || null, brand: p.brand || null, branch: p.branch || null, visited: false, addedBy: me || "" })));
+        closeSheet();
+        toast(`${fresh.length}곳 저장했어요`);
+      } catch (err) { console.error(err); toast("저장하지 못했어요"); }
+    };
+    return;
+  }
   $("#form").innerHTML = `
-    ${multi ? `<div class="picked" style="margin-top:12px"><b>${esc(sameBrand || `선택한 ${multi.length}곳`)}</b>${multi.map((p) => `
-      <div class="result-sub" style="white-space:normal">– <b>${esc(sameBrand ? p.branch : p.name)}</b>: ${esc(p.address)}</div>`).join("")}</div>`
-    : cafe.x ? `<div class="picked" style="margin-top:12px"><b>${esc(cafe.name)}</b><div class="result-sub">${esc(cafe.address)}</div></div>` : `
+    ${cafe.x ? `<div class="picked" style="margin-top:12px"><b>${esc(cafe.name)}</b><div class="result-sub">${esc(cafe.address)}</div></div>` : `
       <label>${M().noun} 이름</label><input type="text" id="fName" value="${esc(cafe.name)}">
       <label>주소 또는 동네 (선택)</label><input type="text" id="fAddr" value="${esc(cafe.address)}" placeholder="예: 서울 마포구 연남동">`}
-    ${multi ? `<div class="hint">특징·메모는 ${multi.length}곳 모두에 똑같이 들어가요. 지점별 네이버지도 링크는 저장한 뒤 지점 수정에서 넣을 수 있어요.</div>` : `
     <label>네이버지도 링크 (선택)</label>
     <input type="url" id="fNaver" value="${esc(cafe.naverUrl)}" placeholder="https://naver.me/...">
-    <div class="hint">네이버지도에서 ${M().noun} → 공유 → 링크 복사 후 붙여 넣으면, 누를 때 그 ${M().noun}${josa(M().noun, "이", "가")} 바로 열려요.</div>`}
+    <div class="hint">네이버지도에서 ${M().noun} → 공유 → 링크 복사 후 붙여 넣으면, 누를 때 그 ${M().noun}${josa(M().noun, "이", "가")} 바로 열려요.</div>
     <label>특징 (선택, 여러 개 골라도 돼요)</label>
     <div class="checks ${M().tags.length > 6 ? "many" : ""}">${checkRows(M().tags.map((t) => `
       <label class="check" data-k="${t.key}"><input type="checkbox" id="f_${t.key}" ${cafe[t.key] ? "checked" : ""}>${checkLabel(t)}</label>`))}
@@ -894,21 +929,6 @@ function showForm(cafe, editing = false) {
     <button class="btn main full" id="fSave">${editing ? "수정 저장" : "저장"}</button>
     ${editing ? `<button class="btn full" id="fDel" style="color:#d04848">삭제</button>` : ""}`;
   $("#fSave").onclick = async () => {
-    const common = {
-      memo: $("#fMemo").value.trim(),
-      ...Object.fromEntries(M().tags.map((t) => [t.key, $("#f_" + t.key).checked])),
-    };
-    if (multi) {
-      // 고른 지점마다 하나씩 저장 (이미 저장된 곳은 건너뛰어요)
-      const fresh = multi.filter((p) => !findDuplicate(p));
-      try {
-        await Promise.all(fresh.map((p) => store.add({ ...common, name: p.name, address: p.address, naverUrl: "", kind: mode,
-          x: p.x || null, y: p.y || null, kakaoId: p.kakaoId || null, brand: p.brand || null, branch: p.branch || null, visited: false, addedBy: me || "" })));
-        closeSheet();
-        toast(`${fresh.length}곳 저장했어요`);
-      } catch (err) { console.error(err); toast("저장하지 못했어요"); }
-      return;
-    }
     const name = cafe.x ? cafe.name : $("#fName").value.trim();
     if (!name) return toast(`${M().noun} 이름을 적어 주세요`);
     if (!editing) {
@@ -943,36 +963,21 @@ function openEdit(cafe) {
   showForm(cafe, true);
 }
 
-// 체인점 카드 수정: 특징·메모는 지점 전체에, 지점마다 따로 수정·삭제도 돼요
+// 체인점 카드 수정: 지점마다 특징·메모·네이버지도 링크를 따로 고치고, 한 번에 저장해요
 function openGroupEdit(brand, items) {
-  const memos = [...new Set(items.map((c) => c.memo).filter(Boolean))];
   openSheet(`
-    <h2><span>${esc(brand)} 수정</span><button class="close">✕</button></h2>
-    <div class="hint">특징·메모는 지점 ${items.length}곳 모두에 똑같이 들어가요</div>
-    <label>특징 (선택, 여러 개 골라도 돼요)</label>
-    <div class="checks ${M().tags.length > 6 ? "many" : ""}">${checkRows(M().tags.map((t) => `
-      <label class="check" data-k="${t.key}"><input type="checkbox" id="f_${t.key}" ${items.some((c) => c[t.key]) ? "checked" : ""}>${checkLabel(t)}</label>`))}
-    </div>
-    <label>메모 (선택)</label>
-    <textarea id="fMemo" placeholder="${M().memoPh}">${esc(memos.join("\n"))}</textarea>
+    <h2><span>${esc(brand)} 수정<span class="branch-count">지점 ${items.length}</span></span><button class="close">✕</button></h2>
+    <div id="gBranches">${items.map((c, i) => branchBlock(i, branchOf(c), c, { naver: true, del: c.id })).join("")}</div>
     <button class="btn main full" id="gSave">수정 저장</button>
-    <label style="margin-top:20px">지점 (지점마다 네이버지도 링크 넣기·삭제)</label>
-    <div id="gBranches">${items.map((c) => `
-      <div class="rated"><span><b>${esc(branchOf(c))}</b><small>${esc(c.address)}</small></span>
-        <button class="btn" data-edit="${esc(c.id)}">수정</button><button class="btn" data-del="${esc(c.id)}" style="color:#d04848">삭제</button></div>`).join("")}
-    </div>
     <button class="btn full" id="gDelAll" style="color:#d04848">지점 모두 삭제</button>`);
   $("#gSave").onclick = async () => {
-    const data = { memo: $("#fMemo").value.trim(), ...Object.fromEntries(M().tags.map((t) => [t.key, $("#f_" + t.key).checked])) };
-    try { await Promise.all(items.map((c) => store.update(c.id, data))); closeSheet(); toast("수정했어요"); }
+    try { await Promise.all(items.map((c, i) => store.update(c.id, readBranch(i, true)))); closeSheet(); toast("수정했어요"); }
     catch (err) { console.error(err); toast("저장하지 못했어요"); }
   };
   $("#gBranches").onclick = async (e) => {
-    const ed = e.target.closest("[data-edit]"), del = e.target.closest("[data-del]");
-    const id = ed ? ed.dataset.edit : del ? del.dataset.del : null;
-    const c = items.find((x) => x.id === id);
+    const del = e.target.closest("[data-del]");
+    const c = del && items.find((x) => x.id === del.dataset.del);
     if (!c) return;
-    if (ed) return openEdit(c);
     if (!confirm(`'${c.name}'을(를) 지울까요?`)) return;
     try { await store.remove(c.id); closeSheet(); toast("지웠어요"); }
     catch (err) { console.error(err); toast("지우지 못했어요"); }

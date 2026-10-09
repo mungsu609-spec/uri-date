@@ -265,6 +265,51 @@ input[type=date] { display: block; min-height: 48px; -webkit-appearance: none; a
   opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 20;
 }
 .toast.show { opacity: 1; }
+/* 지도로 보기: 화면 전체를 지도로 */
+#mapView { position: fixed; inset: 0; z-index: 5; display: flex; flex-direction: column; background: var(--bg); padding-top: env(safe-area-inset-top); }
+#mapView[hidden] { display: none; }
+.map-head { width: 100%; }
+.map-head header { padding: 12px 0 8px; }
+.map-head .chips { margin-bottom: 4px; }
+.map-head .hint { margin: 0 0 8px; min-height: 0; }
+.map-box { position: relative; flex: 1; min-height: 0; }
+#map { position: absolute; inset: 0; }
+.map-me {
+  position: absolute; top: 12px; right: 12px; z-index: 2; width: 44px; height: 44px; border-radius: 50%;
+  background: var(--card); box-shadow: 0 2px 10px rgba(0,0,0,.2); font-size: 20px;
+}
+.map-card {
+  position: absolute; left: 12px; right: 12px; bottom: calc(env(safe-area-inset-bottom) + 12px); z-index: 3;
+  max-width: 536px; margin: 0 auto; background: var(--card); border-radius: 18px; padding: 14px 16px; box-shadow: 0 6px 24px rgba(0,0,0,.25);
+}
+.map-card .close { position: absolute; top: 8px; right: 8px; }
+.map-card .card-top { padding-right: 26px; }
+/* 지도 핀: 물방울 모양, 카페는 갈색 · 맛집은 분홍, 가본 곳은 흐리게 */
+.pin {
+  width: 34px; height: 34px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); margin-bottom: 8px;
+  display: flex; align-items: center; justify-content: center; border: 2px solid #fff; box-shadow: 0 2px 6px rgba(0,0,0,.35); cursor: pointer;
+  transition: transform .15s;
+}
+.pin span { transform: rotate(45deg); font-size: 16px; line-height: 1; }
+.pin.cafe { background: #9a6a4f; }
+.pin.food { background: #e8677d; }
+.pin.visited { opacity: .5; }
+.pin.sel { transform: rotate(-45deg) scale(1.3); opacity: 1; box-shadow: 0 0 0 3px rgba(232,103,125,.45), 0 2px 6px rgba(0,0,0,.35); }
+.me-dot { width: 16px; height: 16px; border-radius: 50%; background: #2f80ed; border: 3px solid #fff; box-shadow: 0 0 0 6px rgba(47,128,237,.25); }
+
+/* 지운 뒤 5초 동안 뜨는 되돌리기 줄 (아래 막대가 5초 동안 줄어들어요) */
+.undo {
+  position: fixed; left: 16px; right: 16px; max-width: 528px; margin: 0 auto; bottom: calc(env(safe-area-inset-bottom) + 86px);
+  display: flex; align-items: center; gap: 10px; padding: 12px 12px 12px 16px; border-radius: 16px; overflow: hidden;
+  background: var(--text); color: var(--bg); font-size: 14px; box-shadow: 0 6px 20px rgba(0,0,0,.25); z-index: 25;
+  opacity: 0; transform: translateY(16px); pointer-events: none; transition: opacity .2s, transform .2s;
+}
+.undo.show { opacity: 1; transform: none; pointer-events: auto; }
+#undoText { flex: 1; min-width: 0; word-break: keep-all; }
+#undoBtn { flex: none; padding: 8px 14px; border-radius: 10px; background: var(--accent); color: #fff; font-weight: 700; font-size: 14px; }
+.undo-bar { position: absolute; left: 0; bottom: 0; height: 3px; width: 100%; background: var(--accent); transform-origin: left; }
+.undo.show .undo-bar { animation: undoBar 5s linear forwards; }
+@keyframes undoBar { from { transform: scaleX(1); } to { transform: scaleX(0); } }
 </style>
 </head>
 <body>
@@ -284,6 +329,11 @@ input[type=date] { display: block; min-height: 48px; -webkit-appearance: none; a
     <button class="menu-item" data-go="food">
       <span class="menu-emoji">🍽</span>
       <span class="menu-text"><b>병가 맛집 데이트</b><small>맛집 리스트 · 뽑기 · 근처 카페</small></span>
+      <span class="menu-arrow">›</span>
+    </button>
+    <button class="menu-item" data-go="map">
+      <span class="menu-emoji">🗺</span>
+      <span class="menu-text"><b>지도로 보기</b><small>저장한 카페 · 맛집을 지도에서 한눈에</small></span>
       <span class="menu-arrow">›</span>
     </button>
     <button class="menu-item" id="btnCourse">
@@ -341,8 +391,31 @@ input[type=date] { display: block; min-height: 48px; -webkit-appearance: none; a
   <button class="fab top" id="btnTop" aria-label="맨 위로">↑</button>
 </div>
 
+<!-- 지도로 보기: 저장한 곳을 지도 위 핀으로 -->
+<div id="mapView" hidden>
+  <div class="wrap map-head">
+    <header>
+      <button class="back-btn" data-go="home">‹ 홈</button>
+      <h1>🗺 지도로 보기</h1>
+    </header>
+    <div class="chips" id="mapChips">
+      <button class="chip on" data-k="all">전체</button>
+      <button class="chip" data-k="cafe">☕ 카페</button>
+      <button class="chip" data-k="food">🍽 맛집</button>
+      <button class="chip" data-k="new">✨ 안 가본 곳</button>
+    </div>
+    <div class="hint" id="mapHint"></div>
+  </div>
+  <div class="map-box">
+    <div id="map"></div>
+    <button class="map-me" id="mapMe" aria-label="내 위치">📍</button>
+    <div class="map-card" id="mapCard" hidden></div>
+  </div>
+</div>
+
 <div class="sheet-bg" id="sheetBg"><div class="sheet" id="sheet"></div></div>
 <div class="toast" id="toast"></div>
+<div class="undo" id="undo"><span id="undoText"></span><button id="undoBtn">되돌리기</button><div class="undo-bar"></div></div>
 
 <script src="config.js"></script>
 <script type="module">
@@ -409,6 +482,7 @@ function localStore(name) {
     async add(cafe) { save([{ ...cafe, id: Date.now().toString(36) + Math.random().toString(36).slice(2, 8), createdAt: Date.now() }, ...all()]); },
     async update(id, patch) { save(all().map((c) => (c.id === id ? { ...c, ...patch } : c))); },
     async set(id, data) { save([{ ...data, id, createdAt: Date.now() }, ...all().filter((c) => c.id !== id)]); },
+    async restore(id, data) { save([{ ...data, id }, ...all().filter((c) => c.id !== id)]); },   // 되돌리기: 추가한 날짜까지 그대로
     async remove(id) { save(all().filter((c) => c.id !== id)); },
   };
 }
@@ -432,6 +506,7 @@ async function firebaseStore(roomCode, name) {
     add: (cafe) => fs.addDoc(col, { ...cafe, createdAt: Date.now() }),
     update: (id, patch) => fs.updateDoc(fs.doc(col, id), patch),
     set: (id, data) => fs.setDoc(fs.doc(col, id), { ...data, createdAt: Date.now() }),
+    restore: (id, data) => fs.setDoc(fs.doc(col, id), data),
     remove: (id) => fs.deleteDoc(fs.doc(col, id)),
   };
 }
@@ -762,7 +837,7 @@ $("#sortSel").addEventListener("change", (e) => {
 });
 $("#distHint").addEventListener("click", (e) => { if (e.target.id === "relocate") locate("name", true); });
 // 앱을 다시 열면 그사이 이동했을 수 있으니 위치를 새로 찾아요
-document.addEventListener("visibilitychange", () => { if (!document.hidden && view !== "home" && sortBy === "near" && !locating) locate("name", true); });
+document.addEventListener("visibilitychange", () => { if (!document.hidden && (view === "cafe" || view === "food") && sortBy === "near" && !locating) locate("name", true); });
 
 $("#filters").addEventListener("click", (e) => {
   const b = e.target.closest(".chip");
@@ -1009,12 +1084,33 @@ function showForm(cafe, editing = false) {
       toast((editing ? "수정했어요" : "저장했어요") + posMsg);
     } catch (err) { console.error(err); toast("저장하지 못했어요"); }
   };
-  if (editing) $("#fDel").onclick = async () => {
-    if (!confirm(`'${cafe.name}'을(를) 지울까요?`)) return;
-    await store.remove(cafe.id);
-    closeSheet();
-    toast("지웠어요");
+  if (editing) $("#fDel").onclick = () => {
+    if (confirm(`'${cafe.name}'을(를) 지울까요?`)) removePlaces([cafe], `'${cafe.name}'`);
   };
+}
+
+// ---------- 지우기 + 5초 동안 되돌리기 ----------
+// 지우기 전 내용을 통째로 기억해 두었다가, 되돌리기를 누르면 같은 id로 그대로 다시 넣어요
+async function removePlaces(list, label) {
+  const saved = list.map(({ id, ...data }) => ({ id, data }));
+  try { await Promise.all(list.map((c) => store.remove(c.id))); }
+  catch (err) { console.error(err); return toast("지우지 못했어요"); }
+  closeSheet();
+  showUndo(`${label}을(를) 지웠어요`, async () => {
+    try { await Promise.all(saved.map((s) => store.restore(s.id, s.data))); toast("되돌렸어요"); }
+    catch (err) { console.error(err); toast("되돌리지 못했어요"); }
+  });
+}
+function showUndo(text, onUndo) {
+  const u = $("#undo");
+  $("#undoText").textContent = text;
+  $("#undoBtn").onclick = () => { hide(); onUndo(); };
+  const bar = u.querySelector(".undo-bar");
+  bar.style.animation = "none"; void bar.offsetWidth; bar.style.animation = "";   // 줄어드는 막대 처음부터
+  u.classList.add("show");
+  clearTimeout(showUndo.timer);
+  showUndo.timer = setTimeout(hide, 5000);
+  function hide() { clearTimeout(showUndo.timer); u.classList.remove("show"); }
 }
 
 function openEdit(cafe) {
@@ -1037,14 +1133,10 @@ function openGroupEdit(brand, items) {
     const del = e.target.closest("[data-del]");
     const c = del && items.find((x) => x.id === del.dataset.del);
     if (!c) return;
-    if (!confirm(`'${c.name}'을(를) 지울까요?`)) return;
-    try { await store.remove(c.id); closeSheet(); toast("지웠어요"); }
-    catch (err) { console.error(err); toast("지우지 못했어요"); }
+    if (confirm(`'${c.name}'을(를) 지울까요?`)) removePlaces([c], `'${c.name}'`);
   };
-  $("#gDelAll").onclick = async () => {
-    if (!confirm(`${brand} 지점 ${items.length}곳을 모두 지울까요?`)) return;
-    try { await Promise.all(items.map((c) => store.remove(c.id))); closeSheet(); toast("지웠어요"); }
-    catch (err) { console.error(err); toast("지우지 못했어요"); }
+  $("#gDelAll").onclick = () => {
+    if (confirm(`${brand} 지점 ${items.length}곳을 모두 지울까요?`)) removePlaces(items, `${brand} 지점 ${items.length}곳`);
   };
 }
 
@@ -1667,16 +1759,108 @@ function openSettings(first = false) {
   };
 }
 
-// ---------- 화면 바꾸기 (홈 ↔ 카페 데이트 / 맛집 데이트) ----------
+// ---------- 지도로 보기 (홈 → 🗺) ----------
+// 위치를 아는 저장 장소를 핀으로 보여 줘요. 핀을 누르면 아래 카드에 정보와 버튼이 떠요
+let kmap = null, mapPins = [], mePin = null, mapSel = null;
+let mapKind = "all", mapOnlyNew = false;
+async function openMap() {
+  if (!(await kakaoReady)) { $("#mapHint").textContent = "카카오 키가 없어서 지도를 열 수 없어요"; return; }
+  if (!kmap) {
+    kmap = new kakao.maps.Map($("#map"), { center: new kakao.maps.LatLng(HOME.y, HOME.x), level: 6 });
+    kakao.maps.event.addListener(kmap, "click", () => selectPin(null));
+  }
+  kmap.relayout();
+  mapSel = null;          // 다시 들어오면 카드는 닫힌 채로
+  $("#mapCard").hidden = true;
+  drawMap(true);
+}
+function drawMap(fit) {
+  if (!kmap) return;
+  mapPins.forEach((p) => p.ov.setMap(null));
+  mapPins = [];
+  const ofKind = allPlaces.filter((c) => (mapKind === "all" || kindOf(c) === mapKind) && (!mapOnlyNew || !c.visited));
+  const list = ofKind.filter((c) => c.x && c.y);
+  const bounds = new kakao.maps.LatLngBounds();
+  list.forEach((c) => {
+    const el = document.createElement("div");
+    el.className = `pin ${kindOf(c)} ${c.visited ? "visited" : ""} ${mapSel === c.id ? "sel" : ""}`;
+    el.innerHTML = `<span>${kindOf(c) === "food" ? "🍽" : "☕"}</span>`;
+    el.addEventListener("click", (e) => { e.stopPropagation(); selectPin(c.id); });
+    const pos = new kakao.maps.LatLng(+c.y, +c.x);
+    const ov = new kakao.maps.CustomOverlay({ position: pos, content: el, xAnchor: 0.5, yAnchor: 1, clickable: true, zIndex: mapSel === c.id ? 3 : 1 });
+    ov.setMap(kmap);
+    mapPins.push({ id: c.id, ov, el });
+    bounds.extend(pos);
+  });
+  const noPos = ofKind.length - list.length;
+  $("#mapHint").textContent = !list.length ? "지도에 보여 줄 곳이 없어요" : `${list.length}곳${noPos ? ` · 위치를 모르는 ${noPos}곳은 지도에 없어요` : ""}`;
+  if (fit && list.length) {
+    if (list.length === 1) { kmap.setCenter(bounds.getSouthWest()); kmap.setLevel(4); }
+    else kmap.setBounds(bounds, 60, 30, 30, 30);
+  }
+  // 고른 곳이 지워졌거나 걸러졌으면 카드 닫기
+  if (mapSel && !list.some((c) => c.id === mapSel)) selectPin(null);
+  else if (mapSel) selectPin(mapSel);
+}
+function selectPin(id) {
+  mapSel = id;
+  mapPins.forEach((p) => { p.el.classList.toggle("sel", p.id === id); p.ov.setZIndex(p.id === id ? 3 : 1); });
+  const card = $("#mapCard");
+  const c = id && allPlaces.find((x) => x.id === id);
+  if (!c) { card.hidden = true; return; }
+  const k = kindOf(c), MO = MODES[k];
+  const tags = MO.tags.filter((t) => c[t.key]);
+  card.innerHTML = `
+    <button class="close" id="mcClose">✕</button>
+    <div class="card-top"><div class="card-name">${MO.emoji} ${esc(c.name)}</div>${c.visited ? `<span class="badge">가봤어요</span>` : ""}</div>
+    ${c.address ? `<div class="card-addr">${esc(c.address)}</div>` : ""}
+    ${tags.length ? `<div class="tags">${tags.map((t) => `<span class="tag">${t.label}</span>`).join("")}</div>` : ""}
+    ${c.memo ? `<div class="card-memo">${esc(c.memo)}</div>` : ""}
+    <div class="actions">
+      <button class="btn main sm" id="mcNear">${MO.nearBtn}</button>
+      <button class="btn naver sm" id="mcNaver">N 지도</button>
+      <button class="btn sm" id="mcList">리스트에서 보기</button>
+    </div>`;
+  card.hidden = false;
+  $("#mcClose").onclick = () => selectPin(null);
+  $("#mcNear").onclick = () => openNearby(c, MO.near);
+  $("#mcNaver").onclick = () => openNaver(c.name + " " + regionOf(c.address), c.naverUrl);
+  $("#mcList").onclick = () => jumpTo(c);
+}
+$("#mapChips").addEventListener("click", (e) => {
+  const b = e.target.closest(".chip");
+  if (!b) return;
+  if (b.dataset.k === "new") { mapOnlyNew = !mapOnlyNew; b.classList.toggle("on", mapOnlyNew); }
+  else { mapKind = b.dataset.k; document.querySelectorAll("#mapChips .chip:not([data-k=new])").forEach((x) => x.classList.toggle("on", x === b)); }
+  drawMap(true);
+});
+// 📍 내 위치로 이동 (위치는 이 폰에서 지도 이동에만 쓰고 저장하지 않아요)
+$("#mapMe").addEventListener("click", () => {
+  if (!kmap || !navigator.geolocation) return toast("이 폰에서는 위치를 쓸 수 없어요");
+  toast("내 위치를 찾는 중…");
+  navigator.geolocation.getCurrentPosition((p) => {
+    const pos = new kakao.maps.LatLng(p.coords.latitude, p.coords.longitude);
+    if (!mePin) { const el = document.createElement("div"); el.className = "me-dot"; mePin = new kakao.maps.CustomOverlay({ position: pos, content: el, zIndex: 4 }); }
+    mePin.setPosition(pos); mePin.setMap(kmap);
+    kmap.setCenter(pos); kmap.setLevel(5);
+  }, (err) => toast(err.code === 1 ? "위치 사용이 꺼져 있어요. 설정 → 개인정보 보호 및 보안 → 위치 서비스에서 켜 주세요" : "위치를 찾지 못했어요"),
+  { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 });
+});
+
+// ---------- 화면 바꾸기 (홈 ↔ 카페 데이트 / 맛집 데이트 / 지도) ----------
 function go(v) {
   view = v;
+  const isList = v === "cafe" || v === "food";
   $("#homeView").hidden = v !== "home";
-  $("#listView").hidden = v === "home";
+  $("#listView").hidden = !isList;
+  $("#mapView").hidden = v !== "map";
   window.scrollTo(0, 0);
   topBtn();
-  if (v !== "home") setMode(v);
+  if (v === "map") openMap();
+  if (!isList) return;
+  setMode(v);
   // 내 위치순이면 리스트 화면에 들어올 때 위치를 새로 찾아요
-  if (v !== "home" && sortBy === "near" && !locating) locate("name", true);
+  if (sortBy === "near" && !locating) locate("name", true);
 }
 // 카페 화면 ↔ 맛집 화면: 같은 틀에 글자·체크박스·목록만 바꿔 끼워요
 function setMode(m) {
@@ -1724,7 +1908,7 @@ async function start() {
   if (!useFirebase) notes.push("지금은 <b>이 폰에만 저장</b>돼요.");
   if (!CFG.KAKAO_JS_KEY) notes.push("카카오 키가 없어서 검색 대신 <b>직접 입력</b>해요.");
   $("#banner").innerHTML = notes.length ? `<div class="banner">${notes.join(" ")}</div>` : "";
-  store.subscribe((list) => { allPlaces = list; splitPlaces(); fillPositions(list); });
+  store.subscribe((list) => { allPlaces = list; splitPlaces(); fillPositions(list); if (view === "map") drawMap(false); });
   if (useFirebase && !room) openSettings(true);
   else if (!me) openSettings(true);
 }

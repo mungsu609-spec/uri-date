@@ -252,11 +252,6 @@ textarea { min-height: 70px; resize: vertical; }
       <span class="menu-text"><b>병가 맛집 데이트</b><small>맛집 리스트 · 뽑기 · 근처 카페</small></span>
       <span class="menu-arrow">›</span>
     </button>
-    <button class="menu-item" id="btnFindHome">
-      <span class="menu-emoji">🔍</span>
-      <span class="menu-text"><b>저장한 곳 찾기</b><small>추가한 카페 · 맛집 검색</small></span>
-      <span class="menu-arrow">›</span>
-    </button>
     <button class="menu-item" id="btnRated">
       <span class="menu-emoji">👍</span>
       <span class="menu-text"><b>평가한 곳</b><small>좋아요 · 싫어요 모아 보기</small></span>
@@ -997,7 +992,7 @@ function pickCafe(onlyNew) {
 $("#btnPickAll").addEventListener("click", () => pickCafe(false));
 $("#btnPickNew").addEventListener("click", () => pickCafe(true));
 
-// ---------- 저장한 곳 찾기 (홈 → 🔍, 리스트 화면 오른쪽 위 🔍) ----------
+// ---------- 저장한 곳 찾기 (리스트 화면 오른쪽 위 🔍) ----------
 // 한 글자씩 쓸 때마다 이름이 맞는 곳을 바로 보여 줘요(자동 완성). 초성(ㅋㅇ)이나 쓰다 만 글자(카 → 칸웨이)도 맞춰 줘요.
 const CHO = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ";
 const JONG = ["", "ㄱ", "ㄲ", "ㄳ", "ㄴ", "ㄵ", "ㄶ", "ㄷ", "ㄹ", "ㄺ", "ㄻ", "ㄼ", "ㄽ", "ㄾ", "ㄿ", "ㅀ", "ㅁ", "ㅂ", "ㅄ", "ㅅ", "ㅆ", "ㅇ", "ㅈ", "ㅊ", "ㅋ", "ㅌ", "ㅍ", "ㅎ"];
@@ -1025,7 +1020,6 @@ function findIn(text, query) {
 }
 const markHit = (h) => esc(h.arr.slice(0, h.from).join("")) + `<mark>${esc(h.arr.slice(h.from, h.to).join(""))}</mark>` + esc(h.arr.slice(h.to).join(""));
 
-$("#btnFindHome").addEventListener("click", () => openFind("all"));
 $("#btnFind").addEventListener("click", () => openFind(mode));
 function openFind(tab) {
   openSheet(`

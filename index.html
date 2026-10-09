@@ -163,11 +163,13 @@ textarea { min-height: 70px; resize: vertical; }
   background: var(--card); border: 1px solid var(--line); color: var(--text); font-size: 15px;
 }
 .checks input { width: 18px; height: 18px; margin: 0; accent-color: var(--accent); }
-/* 체크박스가 많을 때(맛집 8개): 두 줄에 들어가게 이모티콘을 빼고 여백·체크 칸만 살짝 줄여요 (글자 크기는 그대로) */
-.checks.many { gap: 5px; }
-.checks.many label.check { padding: 7px; gap: 4px; }
+/* 체크박스가 많을 때(맛집 8개): 4개씩 두 줄. 이모티콘은 '주차 가능'에만 두고 여백·체크 칸만 살짝 줄여요 (글자 크기는 그대로) */
+.checks.many { gap: 4px; }
+.checks.many label.check { padding: 7px 5px; gap: 4px; }
 .checks.many input { width: 16px; height: 16px; }
 .checks.many .emo { display: none; }
+.checks.many label[data-k="parking"] .emo { display: inline; }
+.checks .row-break { flex-basis: 100%; height: 0; }
 .tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
 .tag { font-size: 12px; padding: 3px 9px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
 
@@ -502,6 +504,8 @@ const kindOf = (c) => c.kind || "cafe";
 const josa = (w, a, b) => ((w.charCodeAt(w.length - 1) - 0xac00) % 28 ? a : b);  // 받침 있으면 a
 // 체크박스 글자: 이모티콘은 따로 감싸서, 칸이 좁으면 이모티콘만 줄이거나 숨길 수 있게 해요
 const checkLabel = (t) => { const [emo, ...rest] = t.label.split(" "); return `<span class="emo">${emo}</span>${rest.join(" ")}`; };
+// 체크박스가 많으면(맛집 8개) 절반에서 줄을 바꿔 4개씩 두 줄로
+const rowBreak = (i, n) => (n > 6 && i === Math.ceil(n / 2) - 1 ? `<span class="row-break"></span>` : "");
 function tagsHtml(c) {
   const on = M().tags.filter((t) => c[t.key]);
   return on.length ? `<div class="tags">${on.map((t) => `<span class="tag">${t.label}</span>`).join("")}</div>` : "";
@@ -688,8 +692,8 @@ function showForm(cafe, editing = false) {
     <input type="url" id="fNaver" value="${esc(cafe.naverUrl)}" placeholder="https://naver.me/...">
     <div class="hint">네이버지도에서 ${M().noun} → 공유 → 링크 복사 후 붙여 넣으면, 누를 때 그 ${M().noun}${josa(M().noun, "이", "가")} 바로 열려요.</div>
     <label>특징 (선택, 여러 개 골라도 돼요)</label>
-    <div class="checks ${M().tags.length > 6 ? "many" : ""}">${M().tags.map((t) => `
-      <label class="check"><input type="checkbox" id="f_${t.key}" ${cafe[t.key] ? "checked" : ""}>${checkLabel(t)}</label>`).join("")}
+    <div class="checks ${M().tags.length > 6 ? "many" : ""}">${M().tags.map((t, i, a) => `
+      <label class="check" data-k="${t.key}"><input type="checkbox" id="f_${t.key}" ${cafe[t.key] ? "checked" : ""}>${checkLabel(t)}</label>${rowBreak(i, a.length)}`).join("")}
     </div>
     <label>메모 (선택)</label>
     <textarea id="fMemo" placeholder="${M().memoPh}">${esc(cafe.memo)}</textarea>
@@ -888,8 +892,8 @@ async function openNearby(cafe, target = "food") {
 let lastPickId = null;
 // 뽑기 조건 체크박스 (체크한 특징을 모두 가진 카페에서만 뽑아요)
 const drawPickTags = () => {
-  $("#pickTags").innerHTML = M().tags.map((t) => `
-  <label class="check"><input type="checkbox" data-tag="${t.key}">${checkLabel(t)}</label>`).join("");
+  $("#pickTags").innerHTML = M().tags.map((t, i, a) => `
+  <label class="check" data-k="${t.key}"><input type="checkbox" data-tag="${t.key}">${checkLabel(t)}</label>${rowBreak(i, a.length)}`).join("");
 };
 const pickTagsOn = () => M().tags.filter((t) => $(`#pickTags [data-tag="${t.key}"]`).checked);
 

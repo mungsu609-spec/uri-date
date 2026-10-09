@@ -74,6 +74,17 @@ header h1 { font-size: 22px; margin: 0; flex: 1; }
 }
 .avatar.small { width: 84px; height: 84px; margin: 0; font-size: 28px; }
 .home-title { font-size: 32px; font-weight: 800; margin: 0; letter-spacing: -0.5px; }
+/* 기념일 D-day (제목 아래) */
+.dday { margin-top: 8px; font-size: 15px; color: var(--sub); word-break: keep-all; }
+.dday b { color: var(--accent); }
+.dday .link { font-size: 14px; color: var(--sub); }
+
+/* 오늘의 코스: 맛집 → 카페 두 칸 */
+.course-step { background: var(--card); border-radius: 18px; padding: 14px 16px; box-shadow: var(--shadow); }
+.step-label { font-size: 13px; font-weight: 700; color: var(--accent); margin-bottom: 2px; }
+.course-step .card-name { font-size: 20px; }
+.course-link { text-align: center; color: var(--sub); font-size: 14px; padding: 8px 0; }
+.course-link b { color: var(--text); }
 .photo-row { display: flex; align-items: center; gap: 14px; }
 .photo-row .btns { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
 
@@ -160,12 +171,13 @@ header h1 { font-size: 22px; margin: 0; flex: 1; }
 .close { font-size: 22px; color: var(--sub); padding: 0 4px; }
 
 label { display: block; font-size: 13px; color: var(--sub); margin: 12px 0 4px; }
-input[type=text], input[type=url], textarea {
+input[type=text], input[type=url], input[type=date], textarea {
   width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: var(--card);
   font-size: 16px; outline: none;
 }
 input:focus, textarea:focus { border-color: var(--accent); }
 textarea { min-height: 70px; resize: vertical; }
+input[type=date] { display: block; min-height: 48px; -webkit-appearance: none; appearance: none; text-align: left; }
 .row { display: flex; gap: 8px; }
 .row input { flex: 1; }
 .full { width: 100%; padding: 14px; margin-top: 16px; border-radius: 14px; font-size: 16px; }
@@ -240,6 +252,7 @@ textarea { min-height: 70px; resize: vertical; }
   <div class="home-top">
     <button class="avatar" id="avatar" aria-label="프로필 사진"></button>
     <h1 class="home-title">병가’s 데이트</h1>
+    <div class="dday" id="dday"></div>
   </div>
   <div class="menu">
     <button class="menu-item" data-go="cafe">
@@ -250,6 +263,11 @@ textarea { min-height: 70px; resize: vertical; }
     <button class="menu-item" data-go="food">
       <span class="menu-emoji">🍽</span>
       <span class="menu-text"><b>병가 맛집 데이트</b><small>맛집 리스트 · 뽑기 · 근처 카페</small></span>
+      <span class="menu-arrow">›</span>
+    </button>
+    <button class="menu-item" id="btnCourse">
+      <span class="menu-emoji">🎯</span>
+      <span class="menu-text"><b>오늘의 코스 뽑기</b><small>저장한 맛집 + 근처 카페 한 번에</small></span>
       <span class="menu-arrow">›</span>
     </button>
     <button class="menu-item" id="btnRated">
@@ -459,6 +477,9 @@ let view = "home";      // 지금 보이는 화면: home / cafe / food (cafe·fo
 // (Firebase 규칙을 바꾸지 않아도 되게 이미 허락된 목록을 같이 써요)
 const PROFILE_ID = "_profile";
 let profile = null;     // { photo: "data:image/jpeg;base64,...", by }
+// 사귄 날(D-day)도 같은 방법으로 "_couple" 칸에 저장해서 둘 다 같은 날짜를 봐요
+const COUPLE_ID = "_couple";
+let couple = null;      // { start: "2024-05-01", by }
 
 // ---------- 정렬 (가나다순 / 추가순 / 거리순 / 내 위치순) ----------
 // 거리순 기준: 부산 금정구 금강로 431 (구서백리명가에덴)
@@ -1131,6 +1152,115 @@ function squarePhoto(file, size = 400) {
   });
 }
 
+// ---------- 기념일 D-day (홈 제목 아래) ----------
+// 사귄 날을 1일로 세요 (한국식). 다음 기념일은 100일 단위와 매년 돌아오는 주년 중 가까운 것
+function drawDday() {
+  const el = $("#dday");
+  const start = couple && couple.start;
+  if (!start) { el.innerHTML = `<button class="link" id="ddaySet">💕 사귄 날을 넣으면 D-day가 보여요</button>`; return; }
+  const [y, m, d] = start.split("-").map(Number);
+  const now = new Date();
+  const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  const DAY = 864e5;
+  const days = Math.round((today - Date.UTC(y, m - 1, d)) / DAY) + 1;
+  if (days < 1) { el.innerHTML = `💕 사귄 날까지 <b>D-${1 - days}</b>`; return; }
+  const h = Math.ceil(days / 100) * 100;                       // 100일 단위: 100일, 200일 …
+  const next = [{ label: `${h}일`, left: h - days }];
+  for (let n = 1; ; n++) {                                     // 주년: 1주년, 2주년 …
+    const left = Math.round((Date.UTC(y + n, m - 1, d) - today) / DAY);
+    if (left >= 0) { next.push({ label: `${n}주년`, left }); break; }
+  }
+  const nx = next.sort((a, b) => a.left - b.left)[0];
+  el.innerHTML = `💕 함께한 지 <b>${days.toLocaleString()}일</b>째 · ` +
+    (nx.left === 0 ? `오늘은 <b>${nx.label}</b>이에요 🎉` : `${nx.label}까지 <b>D-${nx.left}</b>`);
+}
+$("#dday").addEventListener("click", (e) => { if (e.target.id === "ddaySet") openSettings(); });
+// 자정이 지나서 다시 열면 날짜가 바뀌어 있을 수 있어요
+document.addEventListener("visibilitychange", () => { if (!document.hidden) drawDday(); });
+
+// ---------- 오늘의 코스 뽑기 (홈 → 🎯) ----------
+// 저장한 맛집 하나를 뽑고, 그 근처(1km 안) 카페를 붙여 줘요.
+// 카페는 우리가 저장한 카페가 먼저(가까운 순), 없으면 카카오에서 찾은 근처 카페(👎 뺀 곳, 👍 먼저)
+const COURSE_R = 1000;
+let lastCourseFood = null;
+let courseTicket = 0;   // 빨리 다시 뽑으면 늦게 온 카카오 결과는 버려요
+$("#btnCourse").addEventListener("click", () => openCourse(false));
+async function openCourse(onlyNew) {
+  const foods = allPlaces.filter((c) => kindOf(c) === "food");
+  if (!foods.length) return toast("먼저 병가 맛집 데이트에 맛집을 추가해 주세요");
+  const ticket = ++courseTicket;
+  openSheet(`
+    <h2><span>🎯 오늘의 코스</span><button class="close">✕</button></h2>
+    <div class="chips" id="courseMode">
+      <button class="chip ${onlyNew ? "" : "on"}" data-n="0">🎲 전체 맛집에서</button>
+      <button class="chip ${onlyNew ? "on" : ""}" data-n="1">✨ 안 가본 맛집만</button>
+    </div>
+    <div id="courseBody"><div class="msg">뽑는 중…</div></div>`);
+  $("#courseMode").onclick = (e) => { const b = e.target.closest(".chip"); if (b) openCourse(b.dataset.n === "1"); };
+  const body = $("#courseBody");
+  // 위치를 아는 맛집에서만 뽑아요 (직접 입력한 맛집은 근처 카페를 찾을 수 없어서)
+  const pool = foods.filter((c) => c.x && c.y && (!onlyNew || !c.visited));
+  if (!pool.length) {
+    body.innerHTML = `<div class="msg">${onlyNew ? "안 가본 맛집이 없어요. 전체 맛집에서 뽑아 보세요." : "위치를 아는 맛집이 없어요. 검색으로 맛집을 추가해 주세요."}</div>`;
+    return;
+  }
+  const from = pool.length > 1 ? pool.filter((c) => c.id !== lastCourseFood) : pool;
+  const food = from[Math.floor(Math.random() * from.length)];
+  lastCourseFood = food.id;
+  const base = { x: +food.x, y: +food.y };
+
+  // 근처 카페 후보: 저장한 카페(1km 안, 가까운 순) → 없으면 카카오 근처 카페
+  let near = allPlaces.filter((c) => kindOf(c) === "cafe" && c.x && c.y)
+    .map((c) => ({ name: c.name, address: c.address, naverUrl: c.naverUrl, visited: c.visited, saved: true,
+      d: Math.round(distFrom(c, base)), tags: CAFE_TAGS.filter((t) => c[t.key]) }))
+    .filter((c) => c.d <= COURSE_R).sort((a, b) => a.d - b.d);
+  if (!near.length && await kakaoReady) {
+    near = await new Promise((resolve) => places.categorySearch("CE7", (data, status) => {
+      if (status !== kakao.maps.services.Status.OK) return resolve([]);
+      const rate = (p) => ratings[p.id] && ratings[p.id].rating;
+      resolve(data.filter((p) => rate(p) !== "bad")
+        .map((p) => ({ name: p.place_name, address: p.road_address_name || p.address_name, d: +p.distance, good: rate(p) === "good", tags: [] }))
+        .sort((a, b) => b.good - a.good || a.d - b.d));
+    }, { location: new kakao.maps.LatLng(base.y, base.x), radius: COURSE_R, sort: kakao.maps.services.SortBy.DISTANCE }));
+  }
+  if (ticket !== courseTicket || !$("#courseBody")) return;
+
+  let ci = 0;
+  const walk = (m) => `직선 <b>${m >= 1000 ? (m / 1000).toFixed(1) + "km" : m + "m"}</b> · 걸어서 약 ${Math.max(1, Math.round(m / 67))}분`;
+  const tagRow = (list) => (list.length ? `<div class="tags">${list.map((t) => `<span class="tag">${t.label}</span>`).join("")}</div>` : "");
+  const draw = () => {
+    const cafe = near[ci];
+    body.innerHTML = `
+      <div class="course-step">
+        <div class="step-label">1. 🍽 밥 먹기</div>
+        <div class="card-top"><div class="card-name">${esc(food.name)}</div>${food.visited ? `<span class="badge">가봤어요</span>` : ""}</div>
+        ${food.address ? `<div class="card-addr">${esc(food.address)}</div>` : ""}
+        ${tagRow(FOOD_TAGS.filter((t) => food[t.key]))}
+        ${food.memo ? `<div class="card-memo">${esc(food.memo)}</div>` : ""}
+        <div class="actions"><button class="btn naver" id="cFoodNv">N 지도</button></div>
+      </div>
+      ${cafe ? `
+        <div class="course-link">↓ ${walk(cafe.d)}</div>
+        <div class="course-step">
+          <div class="step-label">2. ☕ 카페 가기</div>
+          <div class="card-top"><div class="card-name">${esc(cafe.name)}${cafe.saved ? `<span class="saved-badge">저장한 카페</span>` : cafe.good ? `<span class="good-badge">👍 우리 카페</span>` : ""}</div>${cafe.visited ? `<span class="badge">가봤어요</span>` : ""}</div>
+          ${cafe.address ? `<div class="card-addr">${esc(cafe.address)}</div>` : ""}
+          ${tagRow(cafe.tags)}
+          ${cafe.saved ? "" : `<div class="hint">근처에 저장한 카페가 없어서 카카오에서 찾은 카페예요</div>`}
+          <div class="actions"><button class="btn naver" id="cCafeNv">N 지도</button></div>
+        </div>` : `
+        <div class="course-link">1km 안에서 카페를 찾지 못했어요</div>
+        <button class="btn naver full" id="cCafeNv" style="margin-top:0">네이버지도에서 근처 카페 보기</button>`}
+      <button class="btn main full" id="cAgain">🎯 코스 다시 뽑기</button>
+      ${near.length > 1 ? `<button class="btn full" id="cNext" style="margin-top:8px">☕ 카페만 바꾸기 (${ci + 1}/${near.length})</button>` : ""}`;
+    $("#cFoodNv").onclick = () => openNaver(food.name + " " + regionOf(food.address), food.naverUrl);
+    $("#cCafeNv").onclick = () => (cafe ? openNaver(cafe.name + " " + regionOf(cafe.address), cafe.naverUrl) : openNaver(`${food.name} 근처 카페`));
+    $("#cAgain").onclick = () => openCourse(onlyNew);
+    if ($("#cNext")) $("#cNext").onclick = () => { ci = (ci + 1) % near.length; draw(); };
+  };
+  draw();
+}
+
 // ---------- 평가한 곳 (홈 → 👍 평가한 곳) ----------
 // 좋아요 / 싫어요 탭으로 나눠 보여 줘요. 평가 지우기를 누르면 다시 추천에 나와요
 $("#btnRated").addEventListener("click", () => openRated("good"));
@@ -1182,7 +1312,9 @@ function openSettings(first = false) {
           <button class="btn" id="sPhotoDel">사진 지우기</button>
         </div>
         <input type="file" id="sPhotoFile" accept="image/*" hidden>
-      </div>`}
+      </div>
+      <label>사귄 날 (홈에 D-day가 보여요, 둘 다 같이 바뀌어요)</label>
+      <input type="date" id="sStart" value="${esc(couple && couple.start)}">`}
     <label>내 이름 (누가 추가했는지 보여 줘요)</label>
     <input type="text" id="sMe" value="${esc(me)}" placeholder="예: 쵸키맘">
     ${useFirebase ? `
@@ -1217,6 +1349,13 @@ function openSettings(first = false) {
       catch (err) { console.error(err); toast("사진을 지우지 못했어요"); }
     };
   }
+  if ($("#sStart")) $("#sStart").onchange = async (e) => {
+    const v = e.target.value;
+    try {
+      if (v) { await rstore.set(COUPLE_ID, { start: v, by: me || "" }); toast("사귄 날을 저장했어요 💕"); }
+      else { await rstore.remove(COUPLE_ID); toast("사귄 날을 지웠어요"); }
+    } catch (err) { console.error(err); toast("저장하지 못했어요"); }
+  };
   const saveMe = () => { me = $("#sMe").value.trim(); ls.set("dateapp.me", me); };
   const switchRoom = (code) => { ls.set("dateapp.room", code); location.href = location.pathname + "?room=" + encodeURIComponent(code); };
   if (useFirebase) {
@@ -1287,7 +1426,9 @@ async function start() {
   }
   rstore.subscribe((list) => {
     profile = list.find((r) => r.id === PROFILE_ID) || null;
-    ratings = Object.fromEntries(list.filter((r) => r.id !== PROFILE_ID).map((r) => [r.id, r]));
+    couple = list.find((r) => r.id === COUPLE_ID) || null;
+    ratings = Object.fromEntries(list.filter((r) => !r.id.startsWith("_")).map((r) => [r.id, r]));
+    drawDday();
     drawProfile();
     if (nearRedraw) nearRedraw();
     if (ratedRedraw) ratedRedraw();

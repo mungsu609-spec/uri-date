@@ -65,7 +65,9 @@ header h1 { font-size: 22px; margin: 0; flex: 1; }
 @keyframes flash { 0%, 40% { box-shadow: 0 0 0 3px var(--accent); } 100% { box-shadow: var(--shadow); } }
 
 /* 홈 맨 위: 동그란 프로필 사진 + 제목 */
-.home-top { text-align: center; padding: 30px 0 18px; }
+.home-top { position: relative; text-align: center; padding: 30px 0 18px; }
+/* 환경 설정: 홈 오른쪽 위 톱니바퀴 */
+.settings-btn { position: absolute; top: 14px; right: 0; font-size: 20px; }
 .avatar {
   display: flex; align-items: center; justify-content: center; margin: 0 auto 14px;
   width: 128px; height: 128px; border-radius: 50%; overflow: hidden; flex: none;
@@ -316,6 +318,7 @@ input[type=date] { display: block; min-height: 48px; -webkit-appearance: none; a
 <!-- 홈: 앱을 열면 가장 먼저 보이는 화면 -->
 <div class="wrap" id="homeView">
   <div class="home-top">
+    <button class="icon-btn settings-btn" id="btnSettings" aria-label="환경 설정">⚙️</button>
     <button class="avatar" id="avatar" aria-label="프로필 사진"></button>
     <h1 class="home-title">병가’s 데이트</h1>
     <div class="dday" id="dday"></div>
@@ -344,11 +347,6 @@ input[type=date] { display: block; min-height: 48px; -webkit-appearance: none; a
     <button class="menu-item" id="btnRated">
       <span class="menu-emoji">👍</span>
       <span class="menu-text"><b>평가한 곳</b><small>좋아요 · 싫어요 모아 보기</small></span>
-      <span class="menu-arrow">›</span>
-    </button>
-    <button class="menu-item" id="btnSettings">
-      <span class="menu-emoji">⚙️</span>
-      <span class="menu-text"><b>환경 설정</b><small>프로필 사진 · 내 이름 · 커플 코드</small></span>
       <span class="menu-arrow">›</span>
     </button>
   </div>

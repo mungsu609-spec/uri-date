@@ -716,7 +716,7 @@ async function openNearby(cafe, target = "food") {
       <button class="chip on" data-r="500">500m</button>
       <button class="chip" data-r="1000">1km</button>
     </div>
-    <div class="chips" id="kinds"></div>
+    ${target === "food" ? `<div class="chips" id="kinds"></div>` : ""}
     <div id="nearList"></div>
     <button class="btn full" id="nv">네이버지도에서 더 찾아보기</button>`;
   $("#nv").onclick = naverNear;
@@ -724,17 +724,35 @@ async function openNearby(cafe, target = "food") {
   let radius = 500, kind = "전체", items = [], pager = null, skipped = 0;
   const center = new kakao.maps.LatLng(cafe.y, cafe.x);
 
+  // 우리가 저장해 둔 곳 중 반경 안에 있는 곳: 카카오 결과(가까운 순 최대 45곳)에 안 들어 있어도
+  // 저장된 위치로 직접 거리를 재서 목록에 넣어요
+  let pool = [];
+  const savedInRadius = () => {
+    const extra = [];
+    allPlaces.filter((c) => kindOf(c) === target && c.x && c.y).forEach((c) => {
+      const d = Math.round(distFrom(c, { x: +cafe.x, y: +cafe.y }));
+      if (d > radius || items.some((p) => savedOf(p) === c)) return;
+      const tags = MODES[target].tags.filter((t) => c[t.key]).map((t) => t.label).join(" ");
+      extra.push({ id: c.kakaoId || "saved-" + c.id, place_name: c.name, address_name: c.address, distance: d,
+        kind: null, detail: tags || `저장한 ${T.word}`, saved: true });
+    });
+    return extra;
+  };
+
   const draw = () => {
+    pool = [...items, ...savedInRadius()];
+    // 음식 종류 줄(전체·한식·중식…)은 근처 맛집에만 있어요. 근처 카페는 나눌 필요가 없어서 없앴어요
     const kinds = ["전체", ...new Set(items.map((p) => p.kind))];
-    $("#kinds").innerHTML = kinds.map((k) => `<button class="chip ${k === kind ? "on" : ""}" data-k="${esc(k)}">${esc(k)}</button>`).join("");
+    if ($("#kinds")) $("#kinds").innerHTML = kinds.map((k) => `<button class="chip ${k === kind ? "on" : ""}" data-k="${esc(k)}">${esc(k)}</button>`).join("");
     if (!$("#nearList")) return;
     const rateOf = (p) => ratings[p.id] && ratings[p.id].rating;
-    const badCount = items.filter((p) => rateOf(p) === "bad").length;
-    const shown = items
+    const badCount = pool.filter((p) => rateOf(p) === "bad").length;
+    // 순서: 사용자 추가 → 👍 우리 맛집 → 나머지, 각각 가까운 순
+    const shown = pool
       .filter((p) => rateOf(p) !== "bad" && (kind === "전체" || p.kind === kind))
-      .sort((a, b) => (rateOf(b) === "good") - (rateOf(a) === "good") || a.distance - b.distance);
+      .sort((a, b) => b.saved - a.saved || (rateOf(b) === "good") - (rateOf(a) === "good") || a.distance - b.distance);
     $("#nearList").innerHTML = shown.length ? shown.map((p) => `
-      <div class="result" data-i="${items.indexOf(p)}">
+      <div class="result" data-i="${pool.indexOf(p)}">
         <button class="result-main" data-act="open">
           <div class="result-name">${esc(p.place_name)}${p.saved ? `<span class="saved-badge">사용자 추가</span>` : ""}${rateOf(p) === "good" ? `<span class="good-badge">👍 우리 맛집</span>` : ""}</div>
           <div class="result-sub">${esc(p.detail)} · ${p.distance >= 1000 ? (p.distance / 1000).toFixed(1) + "km" : p.distance + "m"}</div>
@@ -781,7 +799,7 @@ async function openNearby(cafe, target = "food") {
     document.querySelectorAll("#radius .chip").forEach((x) => x.classList.toggle("on", x === b));
     load();
   };
-  $("#kinds").onclick = (e) => {
+  if ($("#kinds")) $("#kinds").onclick = (e) => {
     const b = e.target.closest(".chip");
     if (!b) return;
     kind = b.dataset.k;
@@ -790,7 +808,7 @@ async function openNearby(cafe, target = "food") {
   $("#nearList").onclick = async (e) => {
     const b = e.target.closest("button[data-act]");
     if (!b) return;
-    const p = items[+b.closest(".result").dataset.i];
+    const p = pool[+b.closest(".result").dataset.i];
     const act = b.dataset.act;
     if (act === "open") return openNaver(p.place_name + " " + (regionOf(p.address_name) || region));
     const now = ratings[p.id] && ratings[p.id].rating;

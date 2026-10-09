@@ -174,6 +174,7 @@ textarea { min-height: 70px; resize: vertical; }
 .saved-badge { font-size: 11px; color: var(--done); background: var(--done-soft); font-weight: 700; margin-left: 4px; padding: 1px 7px; border-radius: 999px; white-space: nowrap; }
 .rated { display: flex; align-items: center; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
 .rated span { flex: 1; min-width: 0; }
+.rated small { display: block; color: var(--sub); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .result-name { font-weight: 600; }
 .result-sub { font-size: 12px; color: var(--sub); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dist { font-size: 13px; color: var(--accent); font-weight: 600; white-space: nowrap; }
@@ -217,9 +218,14 @@ textarea { min-height: 70px; resize: vertical; }
       <span class="menu-text"><b>병가 맛집 데이트</b><small>맛집 리스트 · 뽑기 · 근처 카페</small></span>
       <span class="menu-arrow">›</span>
     </button>
+    <button class="menu-item" id="btnRated">
+      <span class="menu-emoji">👍</span>
+      <span class="menu-text"><b>평가한 곳</b><small>좋아요 · 싫어요 모아 보기</small></span>
+      <span class="menu-arrow">›</span>
+    </button>
     <button class="menu-item" id="btnSettings">
       <span class="menu-emoji">⚙️</span>
-      <span class="menu-text"><b>환경 설정</b><small>프로필 사진 · 내 이름 · 커플 코드 · 평가한 곳</small></span>
+      <span class="menu-text"><b>환경 설정</b><small>프로필 사진 · 내 이름 · 커플 코드</small></span>
       <span class="menu-arrow">›</span>
     </button>
   </div>
@@ -410,6 +416,7 @@ let cafes = [];         // 지금 보고 있는 화면(카페 또는 맛집)의 
 let rstore = null;      // 맛집 평가 저장소
 let ratings = {};       // 카카오 장소 id → { name, rating: "good" | "bad", by }
 let nearRedraw = null;  // 근처 맛집 창이 열려 있으면 평가가 바뀔 때 다시 그림
+let ratedRedraw = null; // 평가한 곳 창이 열려 있으면 평가가 바뀔 때 다시 그림
 let filter = "all";
 let view = "home";      // 지금 보이는 화면: home / cafe / food (cafe·food는 같은 리스트 화면)
 // 홈 프로필 사진: 평가 목록(ratings) 안에 "_profile"이라는 특별한 칸으로 저장해서 둘 다 같은 사진을 봐요
@@ -948,13 +955,43 @@ function squarePhoto(file, size = 400) {
   });
 }
 
-function ratedListHtml() {
-  const list = Object.entries(ratings).sort((a, b) => (a[1].rating > b[1].rating ? -1 : 1));
-  if (!list.length) return "";
-  return `<label>평가한 곳 (👎는 추천에서 빠져요)</label>
-    <div id="ratedList">${list.map(([id, r]) => `
-      <div class="rated"><span>${r.rating === "good" ? "👍" : "👎"} ${r.type === "cafe" ? "☕" : "🍽"} <b>${esc(r.name)}</b>${r.by ? ` · ${esc(r.by)}` : ""}</span>
-      <button class="btn" data-id="${esc(id)}">평가 지우기</button></div>`).join("")}</div>`;
+// ---------- 평가한 곳 (홈 → 👍 평가한 곳) ----------
+// 좋아요 / 싫어요 탭으로 나눠 보여 줘요. 평가 지우기를 누르면 다시 추천에 나와요
+$("#btnRated").addEventListener("click", () => openRated("good"));
+function openRated(tab) {
+  const draw = () => {
+    if (!$("#ratedTabs")) { ratedRedraw = null; return; }
+    const all = Object.entries(ratings);
+    const count = (r) => all.filter(([, x]) => x.rating === r).length;
+    $("#ratedTabs").innerHTML = [["good", "👍 좋아요"], ["bad", "👎 싫어요"]].map(([r, t]) =>
+      `<button class="chip ${r === tab ? "on" : ""}" data-r="${r}">${t} ${count(r)}</button>`).join("");
+    const list = all.filter(([, x]) => x.rating === tab)
+      .sort((a, b) => (a[1].type === "cafe") - (b[1].type === "cafe") || (a[1].name || "").localeCompare(b[1].name || "", "ko"));
+    $("#ratedBody").innerHTML = list.length ? list.map(([id, r]) => `
+      <div class="rated"><span>${r.type === "cafe" ? "☕" : "🍽"} <b>${esc(r.name)}</b>${r.by ? ` · ${esc(r.by)}` : ""}${r.address ? `<small>${esc(r.address)}</small>` : ""}</span>
+      <button class="btn" data-id="${esc(id)}">평가 지우기</button></div>`).join("")
+      : `<div class="msg">${tab === "good" ? "아직 👍 누른 곳이 없어요" : "아직 👎 누른 곳이 없어요"}</div>`;
+  };
+  openSheet(`
+    <h2><span>👍 평가한 곳</span><button class="close">✕</button></h2>
+    <div class="chips" id="ratedTabs"></div>
+    <div class="hint" id="ratedHint"></div>
+    <div id="ratedBody"></div>`);
+  const hint = () => { $("#ratedHint").textContent = tab === "good" ? "근처 맛집·카페에서 위쪽에 보여요" : "근처 맛집·카페에서 빠져요. 평가를 지우면 다시 나와요"; };
+  $("#ratedTabs").onclick = (e) => {
+    const b = e.target.closest(".chip");
+    if (!b) return;
+    tab = b.dataset.r; hint(); draw();
+  };
+  $("#ratedBody").onclick = async (e) => {
+    const b = e.target.closest("button[data-id]");
+    if (!b) return;
+    try { await rstore.remove(b.dataset.id); toast(tab === "bad" ? "평가를 지웠어요. 다시 추천에 나와요" : "평가를 지웠어요"); }
+    catch (err) { console.error(err); toast("평가를 지우지 못했어요"); }
+    draw();
+  };
+  ratedRedraw = draw;
+  hint(); draw();
 }
 
 function openSettings(first = false) {
@@ -983,7 +1020,6 @@ function openSettings(first = false) {
         <label>애인이 만든 코드가 있으면 입력</label>`}
       <div class="row"><input type="text" id="sCode" placeholder="date-xxxxxxxxxxxx" autocapitalize="off"><button class="btn" id="sJoin">입력</button></div>
     ` : `<div class="banner" style="margin-top:14px">지금은 <b>이 폰에만 저장</b>돼요. Firebase를 설정하면 애인과 같이 쓸 수 있어요.</div>`}
-    ${first === true ? "" : ratedListHtml()}
     <button class="btn full" id="sSave" style="margin-top:16px">${first === true ? "시작하기" : "닫기"}</button>`);
   if ($("#sPhoto")) {
     drawProfile();
@@ -1005,14 +1041,6 @@ function openSettings(first = false) {
       catch (err) { console.error(err); toast("사진을 지우지 못했어요"); }
     };
   }
-  const rl = $("#ratedList");
-  if (rl) rl.onclick = async (e) => {
-    const b = e.target.closest("button[data-id]");
-    if (!b) return;
-    await rstore.remove(b.dataset.id);
-    b.closest(".rated").remove();
-    toast("평가를 지웠어요. 다시 추천에 나와요");
-  };
   const saveMe = () => { me = $("#sMe").value.trim(); ls.set("dateapp.me", me); };
   const switchRoom = (code) => { ls.set("dateapp.room", code); location.href = location.pathname + "?room=" + encodeURIComponent(code); };
   if (useFirebase) {
@@ -1085,6 +1113,7 @@ async function start() {
     ratings = Object.fromEntries(list.filter((r) => r.id !== PROFILE_ID).map((r) => [r.id, r]));
     drawProfile();
     if (nearRedraw) nearRedraw();
+    if (ratedRedraw) ratedRedraw();
   });
   const notes = [];
   if (!useFirebase) notes.push("지금은 <b>이 폰에만 저장</b>돼요.");

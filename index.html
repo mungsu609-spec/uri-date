@@ -102,16 +102,14 @@ header h1 { font-size: 22px; margin: 0; flex: 1; }
 .menu-text small { display: block; font-size: 13px; color: var(--sub); margin-top: 2px; }
 .menu-arrow { font-size: 26px; color: var(--sub); flex: none; }
 
-/* 홈 맨 아래: 둘이 같이 쓰는 할 일 체크리스트 */
-.todo { margin-top: 26px; background: var(--card); border-radius: 18px; box-shadow: var(--shadow); padding: 16px; }
-.todo-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 10px; }
-.todo-head h2 { font-size: 18px; margin: 0; flex: 1; }
-.todo-count { font-size: 13px; color: var(--sub); }
-.todo-add { display: flex; gap: 8px; margin-bottom: 6px; }
-.todo-add input[type=text] { flex: 1; min-width: 0; padding: 10px 12px; background: var(--bg); }
-.todo-add .btn { flex: none; padding: 0 16px; font-size: 15px; }
-.todo-item { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid var(--line); }
-.todo-add + #todoList .todo-item:first-child { border-top: 0; }
+/* 할 일 체크리스트 (홈 메뉴 맨 아래 → 누르면 창) */
+.todo-add { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
+.todo-due { display: flex; align-items: center; gap: 8px; }
+.todo-due label { margin: 0; flex: none; font-size: 14px; }
+.todo-due input[type=date] { flex: 1; min-width: 0; min-height: 44px; padding: 8px 12px; }
+.todo-due .btn { flex: none; min-height: 44px; padding: 0 18px; font-size: 15px; }
+.todo-item { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); }
+.todo-item:first-child { border-top: 0; }
 .todo-check {
   flex: none; width: 24px; height: 24px; border-radius: 7px; border: 2px solid var(--line); background: var(--bg);
   display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 800; color: #fff; padding: 0;
@@ -121,9 +119,14 @@ header h1 { font-size: 22px; margin: 0; flex: 1; }
 .todo-text { flex: 1; min-width: 0; text-align: left; padding: 0; word-break: keep-all; overflow-wrap: anywhere; }
 .todo-text small { display: block; font-size: 12px; color: var(--sub); }
 .todo-item.done .todo-text span { color: var(--sub); text-decoration: line-through; }
+/* 기한 D-day 배지: 넉넉 = 회색, 3일 안 = 연분홍, 오늘·지남 = 진분홍 */
+.dbadge { flex: none; font-size: 13px; font-weight: 700; padding: 3px 8px; border-radius: 999px; background: var(--bg); color: var(--sub); border: 1px solid var(--line); white-space: nowrap; }
+.dbadge.soon { background: var(--accent-soft); color: var(--accent); border-color: var(--accent-soft); }
+.dbadge.now { background: var(--accent); color: #fff; border-color: var(--accent); }
+.todo-item.done .dbadge { background: var(--bg); color: var(--sub); border-color: var(--line); opacity: .7; }
 .todo-del { flex: none; color: var(--sub); font-size: 16px; padding: 4px 6px; }
-.todo-empty { text-align: center; color: var(--sub); font-size: 14px; padding: 10px 0 4px; }
-.todo-clear { display: block; margin: 8px auto 0; font-size: 13px; color: var(--sub); text-decoration: underline; }
+.todo-clear { display: block; margin: 10px auto 0; font-size: 13px; color: var(--sub); text-decoration: underline; }
+.menu-text small .soon { color: var(--accent); font-weight: 600; }
 
 .banner { background: var(--accent-soft); border-radius: 14px; padding: 10px 14px; font-size: 14px; margin-bottom: 12px; }
 .banner b { color: var(--accent); }
@@ -382,17 +385,12 @@ input[type=date] { display: block; min-height: 48px; -webkit-appearance: none; a
       <span class="menu-text"><b>평가한 곳</b><small>좋아요 · 싫어요 모아 보기</small></span>
       <span class="menu-arrow">›</span>
     </button>
+    <button class="menu-item" id="btnTodo">
+      <span class="menu-emoji">✅</span>
+      <span class="menu-text"><b>할 일</b><small id="todoSub">둘이 같이 보는 체크리스트</small></span>
+      <span class="menu-arrow">›</span>
+    </button>
   </div>
-  <!-- 할 일 체크리스트: 둘 중 한 사람이 적거나 체크하면 둘 다에게 보여요 -->
-  <section class="todo">
-    <div class="todo-head"><h2>✅ 할 일</h2><span class="todo-count" id="todoCount"></span></div>
-    <form class="todo-add" id="todoForm">
-      <input type="text" id="todoInput" placeholder="예: 영화 예매하기" maxlength="100" enterkeyhint="done" autocomplete="off">
-      <button class="btn main">추가</button>
-    </form>
-    <div id="todoList"></div>
-    <button class="todo-clear" id="todoClear" hidden></button>
-  </section>
 </div>
 
 <!-- 리스트 화면: 병가 카페 데이트 / 병가 맛집 데이트가 같은 틀을 같이 써요 (글자·체크박스만 바뀜) -->
@@ -2045,57 +2043,108 @@ document.addEventListener("click", (e) => {
   if (b) go(b.dataset.go);
 });
 
-// ---------- 할 일 체크리스트 (홈 맨 아래) ----------
-// 안 한 일이 위(먼저 적은 순), 다 한 일은 아래로 내려가고 줄이 그어져요
+// ---------- 할 일 체크리스트 (홈 메뉴 맨 아래 → 누르면 창) ----------
+// 안 한 일이 위(기한 가까운 순 → 기한 없는 일은 먼저 적은 순), 다 한 일은 아래로 내려가고 줄이 그어져요
+// 기한(due)은 "YYYY-MM-DD", 안 정하면 빈칸
+const byTime = (a, b) => (a.createdAt || 0) - (b.createdAt || 0);
+const byDue = (a, b) => (!a.due) - (!b.due) || (a.due || "").localeCompare(b.due || "") || byTime(a, b);
+function dueLeft(due) {   // 오늘부터 기한까지 남은 날 (0 = 오늘, 음수 = 지남)
+  const [y, m, d] = due.split("-").map(Number);
+  const now = new Date();
+  return Math.round((Date.UTC(y, m - 1, d) - Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())) / 864e5);
+}
+const dLabel = (left) => (left === 0 ? "D-Day" : left > 0 ? `D-${left}` : `D+${-left}`);
+const dClass = (left) => (left <= 0 ? "now" : left <= 3 ? "soon" : "");
+function dueText(due) {
+  const [y, m, d] = due.split("-").map(Number);
+  return `${y !== new Date().getFullYear() ? y + "년 " : ""}${m}월 ${d}일까지`;
+}
+let todoRedraw = null;   // 할 일 창이 열려 있으면 목록이 바뀔 때 다시 그림
 function drawTodos() {
-  const byTime = (a, b) => (a.createdAt || 0) - (b.createdAt || 0);
-  const open = todos.filter((t) => !t.done).sort(byTime);
-  const done = todos.filter((t) => t.done).sort(byTime);
-  $("#todoCount").textContent = todos.length ? `${done.length}/${todos.length} 완료` : "";
-  $("#todoList").innerHTML = todos.length
-    ? [...open, ...done].map((t) => `<div class="todo-item${t.done ? " done" : ""}" data-id="${esc(t.id)}">
-        <button class="todo-check" data-t="toggle" aria-label="${t.done ? "안 한 걸로" : "다 했어요"}"></button>
-        <button class="todo-text" data-t="toggle"><span>${esc(t.text)}</span>${t.by ? `<small>${esc(t.by)}</small>` : ""}</button>
-        <button class="todo-del" data-t="del" aria-label="지우기">✕</button>
-      </div>`).join("")
-    : `<div class="todo-empty">아직 할 일이 없어요</div>`;
-  const clear = $("#todoClear");
-  clear.hidden = !done.length;
-  clear.textContent = `다 한 일 ${done.length}개 지우기`;
+  // 홈 메뉴 작은 글씨: 안 한 일 개수 + 가장 급한 기한
+  const open = todos.filter((t) => !t.done).sort(byDue);
+  const urgent = open.find((t) => t.due);
+  const short = (s) => (s.length > 10 ? s.slice(0, 10) + "…" : s);
+  $("#todoSub").innerHTML = !todos.length ? "둘이 같이 보는 체크리스트"
+    : !open.length ? "모두 다 했어요 🎉"
+    : `안 한 일 ${open.length}개` + (urgent
+      ? ` · <span class="${dClass(dueLeft(urgent.due)) ? "soon" : ""}">${esc(short(urgent.text))} ${dLabel(dueLeft(urgent.due))}</span>` : "");
+  if (todoRedraw) todoRedraw();
 }
 // 되돌리기용: id·createdAt 그대로 다시 넣어요
 const todoData = ({ id, ...data }) => data;
 
-$("#todoForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const input = $("#todoInput");
-  const text = input.value.trim();
-  if (!text) { input.focus(); return; }
-  input.value = "";
-  try { await rstore.set(TODO_PREFIX + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), { text, done: false, by: me || "" }); }
-  catch (err) { console.error(err); input.value = text; toast("저장하지 못했어요"); }
-});
-$("#todoList").addEventListener("click", async (e) => {
-  const b = e.target.closest("[data-t]");
-  if (!b) return;
-  const t = todos.find((x) => x.id === b.closest(".todo-item").dataset.id);
-  if (!t) return;
-  try {
-    if (b.dataset.t === "toggle") await rstore.update(t.id, { done: !t.done });
-    else {
-      await rstore.remove(t.id);
-      showUndo(`'${t.text}'을(를) 지웠어요`, () => rstore.restore(t.id, todoData(t)));
-    }
-  } catch (err) { console.error(err); toast("저장하지 못했어요"); }
-});
-$("#todoClear").addEventListener("click", async () => {
-  const done = todos.filter((t) => t.done);
-  if (!done.length || !await askYesNo(`다 한 일 <b>${done.length}개</b>를 지울까요?`)) return;
-  try {
-    await Promise.all(done.map((t) => rstore.remove(t.id)));
-    showUndo(`다 한 일 ${done.length}개를 지웠어요`, () => Promise.all(done.map((t) => rstore.restore(t.id, todoData(t)))));
-  } catch (err) { console.error(err); toast("지우지 못했어요"); }
-});
+$("#btnTodo").addEventListener("click", openTodo);
+function openTodo() {
+  openSheet(`
+    <h2><span>✅ 할 일</span><small class="hint" id="todoCount" style="margin:0"></small><button class="close">✕</button></h2>
+    <form class="todo-add" id="todoForm">
+      <input type="text" id="todoInput" placeholder="예: 영화 예매하기" maxlength="100" enterkeyhint="done" autocomplete="off">
+      <div class="todo-due">
+        <label for="todoDue">📅 기한</label>
+        <input type="date" id="todoDue">
+        <button class="btn main">추가</button>
+      </div>
+      <div class="hint" style="margin:0">기한은 안 정해도 돼요. 정하면 D-day가 보여요.</div>
+    </form>
+    <div id="todoList"></div>
+    <button class="todo-clear" id="todoClear" hidden></button>`);
+  const draw = () => {
+    if (!$("#todoList")) { todoRedraw = null; return; }
+    const open = todos.filter((t) => !t.done).sort(byDue);
+    const done = todos.filter((t) => t.done).sort(byTime);
+    $("#todoCount").textContent = todos.length ? `${done.length}/${todos.length} 완료` : "";
+    $("#todoList").innerHTML = todos.length
+      ? [...open, ...done].map((t) => {
+          const left = t.due ? dueLeft(t.due) : null;
+          const sub = [t.by, t.due && dueText(t.due)].filter(Boolean).map(esc).join(" · ");
+          return `<div class="todo-item${t.done ? " done" : ""}" data-id="${esc(t.id)}">
+          <button class="todo-check" data-t="toggle" aria-label="${t.done ? "안 한 걸로" : "다 했어요"}"></button>
+          <button class="todo-text" data-t="toggle"><span>${esc(t.text)}</span>${sub ? `<small>${sub}</small>` : ""}</button>
+          ${left === null ? "" : `<span class="dbadge ${dClass(left)}">${dLabel(left)}</span>`}
+          <button class="todo-del" data-t="del" aria-label="지우기">✕</button>
+        </div>`;
+        }).join("")
+      : `<div class="msg">아직 할 일이 없어요</div>`;
+    const clear = $("#todoClear");
+    clear.hidden = !done.length;
+    clear.textContent = `다 한 일 ${done.length}개 지우기`;
+  };
+  todoRedraw = draw;
+  draw();
+
+  $("#todoForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const input = $("#todoInput"), dueEl = $("#todoDue");
+    const text = input.value.trim(), due = dueEl.value || "";
+    if (!text) { input.focus(); toast("할 일을 적어 주세요"); return; }
+    input.value = ""; dueEl.value = "";
+    try { await rstore.set(TODO_PREFIX + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), { text, due, done: false, by: me || "" }); }
+    catch (err) { console.error(err); input.value = text; dueEl.value = due; toast("저장하지 못했어요"); }
+  });
+  $("#todoList").addEventListener("click", async (e) => {
+    const b = e.target.closest("[data-t]");
+    if (!b) return;
+    const t = todos.find((x) => x.id === b.closest(".todo-item").dataset.id);
+    if (!t) return;
+    try {
+      if (b.dataset.t === "toggle") await rstore.update(t.id, { done: !t.done });
+      else {
+        await rstore.remove(t.id);
+        showUndo(`'${t.text}'을(를) 지웠어요`, () => rstore.restore(t.id, todoData(t)));
+      }
+    } catch (err) { console.error(err); toast("저장하지 못했어요"); }
+  });
+  $("#todoClear").addEventListener("click", async () => {
+    const done = todos.filter((t) => t.done);
+    if (!done.length || !await askYesNo(`다 한 일 <b>${done.length}개</b>를 지울까요?`)) return;
+    try {
+      await Promise.all(done.map((t) => rstore.remove(t.id)));
+      showUndo(`다 한 일 ${done.length}개를 지웠어요`, () => Promise.all(done.map((t) => rstore.restore(t.id, todoData(t)))));
+    } catch (err) { console.error(err); toast("지우지 못했어요"); }
+  });
+}
+
 
 // ---------- 시작 ----------
 async function start() {

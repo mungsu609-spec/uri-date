@@ -125,6 +125,12 @@ header h1 { font-size: 22px; margin: 0; flex: 1; }
 .dbadge.now { background: var(--accent); color: #fff; border-color: var(--accent); }
 .todo-item.done .dbadge { background: var(--bg); color: var(--sub); border-color: var(--line); opacity: .7; }
 .todo-del { flex: none; color: var(--sub); font-size: 16px; padding: 4px 6px; }
+.todo-edit-btn { flex: none; font-size: 15px; padding: 4px 2px; }
+/* 할 일 수정: 그 줄이 입력 칸으로 바뀌어요 */
+.todo-edit { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.todo-edit .todo-due .btn { padding: 0 12px; font-size: 14px; }
+.todo-edit-btns { display: flex; gap: 8px; }
+.todo-edit-btns .btn { flex: 1; padding: 10px; font-size: 15px; }
 .todo-clear { display: block; margin: 10px auto 0; font-size: 13px; color: var(--sub); text-decoration: underline; }
 .menu-text small .soon { color: var(--accent); font-weight: 600; }
 
@@ -2089,19 +2095,33 @@ function openTodo() {
     </form>
     <div id="todoList"></div>
     <button class="todo-clear" id="todoClear" hidden></button>`);
+  // 수정 중인 할 일 (한 번에 하나). 쓰는 중인 글자는 draft에 두어서 애인이 목록을 바꿔 다시 그려져도 안 지워져요
+  let editing = null, draft = null;
+  const editHtml = (t) => `<div class="todo-item editing" data-id="${esc(t.id)}"><div class="todo-edit">
+      <input type="text" class="te-text" value="${esc(draft.text)}" maxlength="100" enterkeyhint="done" autocomplete="off" aria-label="할 일">
+      <div class="todo-due">
+        <label>📅 기한</label>
+        <input type="date" class="te-due" value="${esc(draft.due)}" aria-label="기한">
+        <button class="btn" data-t="nodue">기한 빼기</button>
+      </div>
+      <div class="todo-edit-btns"><button class="btn" data-t="cancel">취소</button><button class="btn main" data-t="save">저장</button></div>
+    </div></div>`;
   const draw = () => {
     if (!$("#todoList")) { todoRedraw = null; return; }
+    if (editing && !todos.some((t) => t.id === editing)) editing = draft = null;   // 수정하던 게 지워졌으면 그만
     const open = todos.filter((t) => !t.done).sort(byDue);
     const done = todos.filter((t) => t.done).sort(byTime);
     $("#todoCount").textContent = todos.length ? `${done.length}/${todos.length} 완료` : "";
     $("#todoList").innerHTML = todos.length
       ? [...open, ...done].map((t) => {
+          if (t.id === editing) return editHtml(t);
           const left = t.due ? dueLeft(t.due) : null;
           const sub = [t.by, t.due && dueText(t.due)].filter(Boolean).map(esc).join(" · ");
           return `<div class="todo-item${t.done ? " done" : ""}" data-id="${esc(t.id)}">
           <button class="todo-check" data-t="toggle" aria-label="${t.done ? "안 한 걸로" : "다 했어요"}"></button>
           <button class="todo-text" data-t="toggle"><span>${esc(t.text)}</span>${sub ? `<small>${sub}</small>` : ""}</button>
           ${left === null ? "" : `<span class="dbadge ${dClass(left)}">${dLabel(left)}</span>`}
+          <button class="todo-edit-btn" data-t="edit" aria-label="수정">✏️</button>
           <button class="todo-del" data-t="del" aria-label="지우기">✕</button>
         </div>`;
         }).join("")
@@ -2122,13 +2142,44 @@ function openTodo() {
     try { await rstore.set(TODO_PREFIX + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), { text, due, done: false, by: me || "" }); }
     catch (err) { console.error(err); input.value = text; dueEl.value = due; toast("저장하지 못했어요"); }
   });
+  const saveEdit = async () => {
+    const t = todos.find((x) => x.id === editing);
+    if (!t) return;
+    const text = draft.text.trim();
+    if (!text) { $(".te-text").focus(); toast("할 일을 적어 주세요"); return; }
+    const due = draft.due || "";
+    editing = draft = null;
+    draw();
+    if (text === t.text && due === (t.due || "")) return;
+    try { await rstore.update(t.id, { text, due }); toast("고쳤어요"); }
+    catch (err) { console.error(err); toast("저장하지 못했어요"); }
+  };
+  $("#todoList").addEventListener("input", (e) => {
+    if (!draft) return;
+    if (e.target.classList.contains("te-text")) draft.text = e.target.value;
+    if (e.target.classList.contains("te-due")) draft.due = e.target.value;
+  });
+  $("#todoList").addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && e.target.classList.contains("te-text") && !e.isComposing) { e.preventDefault(); saveEdit(); }
+  });
   $("#todoList").addEventListener("click", async (e) => {
     const b = e.target.closest("[data-t]");
     if (!b) return;
     const t = todos.find((x) => x.id === b.closest(".todo-item").dataset.id);
     if (!t) return;
+    const act = b.dataset.t;
+    if (act === "edit") {
+      editing = t.id; draft = { text: t.text, due: t.due || "" };
+      draw();
+      const input = $(".te-text");
+      input.focus(); input.setSelectionRange(input.value.length, input.value.length);
+      return;
+    }
+    if (act === "cancel") { editing = draft = null; draw(); return; }
+    if (act === "nodue") { draft.due = ""; $(".te-due").value = ""; return; }
+    if (act === "save") { saveEdit(); return; }
     try {
-      if (b.dataset.t === "toggle") await rstore.update(t.id, { done: !t.done });
+      if (act === "toggle") await rstore.update(t.id, { done: !t.done });
       else {
         await rstore.remove(t.id);
         showUndo(`'${t.text}'을(를) 지웠어요`, () => rstore.restore(t.id, todoData(t)));

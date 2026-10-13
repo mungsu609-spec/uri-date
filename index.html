@@ -102,6 +102,29 @@ header h1 { font-size: 22px; margin: 0; flex: 1; }
 .menu-text small { display: block; font-size: 13px; color: var(--sub); margin-top: 2px; }
 .menu-arrow { font-size: 26px; color: var(--sub); flex: none; }
 
+/* 홈 맨 아래: 둘이 같이 쓰는 할 일 체크리스트 */
+.todo { margin-top: 26px; background: var(--card); border-radius: 18px; box-shadow: var(--shadow); padding: 16px; }
+.todo-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 10px; }
+.todo-head h2 { font-size: 18px; margin: 0; flex: 1; }
+.todo-count { font-size: 13px; color: var(--sub); }
+.todo-add { display: flex; gap: 8px; margin-bottom: 6px; }
+.todo-add input[type=text] { flex: 1; min-width: 0; padding: 10px 12px; background: var(--bg); }
+.todo-add .btn { flex: none; padding: 0 16px; font-size: 15px; }
+.todo-item { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid var(--line); }
+.todo-add + #todoList .todo-item:first-child { border-top: 0; }
+.todo-check {
+  flex: none; width: 24px; height: 24px; border-radius: 7px; border: 2px solid var(--line); background: var(--bg);
+  display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 800; color: #fff; padding: 0;
+}
+.todo-item.done .todo-check { background: var(--done); border-color: var(--done); }
+.todo-item.done .todo-check::after { content: "✓"; }
+.todo-text { flex: 1; min-width: 0; text-align: left; padding: 0; word-break: keep-all; overflow-wrap: anywhere; }
+.todo-text small { display: block; font-size: 12px; color: var(--sub); }
+.todo-item.done .todo-text span { color: var(--sub); text-decoration: line-through; }
+.todo-del { flex: none; color: var(--sub); font-size: 16px; padding: 4px 6px; }
+.todo-empty { text-align: center; color: var(--sub); font-size: 14px; padding: 10px 0 4px; }
+.todo-clear { display: block; margin: 8px auto 0; font-size: 13px; color: var(--sub); text-decoration: underline; }
+
 .banner { background: var(--accent-soft); border-radius: 14px; padding: 10px 14px; font-size: 14px; margin-bottom: 12px; }
 .banner b { color: var(--accent); }
 
@@ -360,6 +383,16 @@ input[type=date] { display: block; min-height: 48px; -webkit-appearance: none; a
       <span class="menu-arrow">›</span>
     </button>
   </div>
+  <!-- 할 일 체크리스트: 둘 중 한 사람이 적거나 체크하면 둘 다에게 보여요 -->
+  <section class="todo">
+    <div class="todo-head"><h2>✅ 할 일</h2><span class="todo-count" id="todoCount"></span></div>
+    <form class="todo-add" id="todoForm">
+      <input type="text" id="todoInput" placeholder="예: 영화 예매하기" maxlength="100" enterkeyhint="done" autocomplete="off">
+      <button class="btn main">추가</button>
+    </form>
+    <div id="todoList"></div>
+    <button class="todo-clear" id="todoClear" hidden></button>
+  </section>
 </div>
 
 <!-- 리스트 화면: 병가 카페 데이트 / 병가 맛집 데이트가 같은 틀을 같이 써요 (글자·체크박스만 바뀜) -->
@@ -633,6 +666,9 @@ const PROFILE_ID = "_profile";
 let profile = null;     // { photo: "data:image/jpeg;base64,...", by }
 // 사귄 날(D-day)도 같은 방법으로 "_couple" 칸에 저장해서 둘 다 같은 날짜를 봐요
 const COUPLE_ID = "_couple";
+// 할 일 체크리스트도 같은 평가 목록 안에 "_todo_"로 시작하는 칸으로 저장해요 (Firebase 규칙 변경 필요 없음)
+const TODO_PREFIX = "_todo_";
+let todos = [];
 let couple = null;      // { start: "2024-05-01", by }
 
 // ---------- 정렬 (가나다순 / 추가순 / 거리순 / 내 위치순) ----------
@@ -2009,6 +2045,58 @@ document.addEventListener("click", (e) => {
   if (b) go(b.dataset.go);
 });
 
+// ---------- 할 일 체크리스트 (홈 맨 아래) ----------
+// 안 한 일이 위(먼저 적은 순), 다 한 일은 아래로 내려가고 줄이 그어져요
+function drawTodos() {
+  const byTime = (a, b) => (a.createdAt || 0) - (b.createdAt || 0);
+  const open = todos.filter((t) => !t.done).sort(byTime);
+  const done = todos.filter((t) => t.done).sort(byTime);
+  $("#todoCount").textContent = todos.length ? `${done.length}/${todos.length} 완료` : "";
+  $("#todoList").innerHTML = todos.length
+    ? [...open, ...done].map((t) => `<div class="todo-item${t.done ? " done" : ""}" data-id="${esc(t.id)}">
+        <button class="todo-check" data-t="toggle" aria-label="${t.done ? "안 한 걸로" : "다 했어요"}"></button>
+        <button class="todo-text" data-t="toggle"><span>${esc(t.text)}</span>${t.by ? `<small>${esc(t.by)}</small>` : ""}</button>
+        <button class="todo-del" data-t="del" aria-label="지우기">✕</button>
+      </div>`).join("")
+    : `<div class="todo-empty">아직 할 일이 없어요</div>`;
+  const clear = $("#todoClear");
+  clear.hidden = !done.length;
+  clear.textContent = `다 한 일 ${done.length}개 지우기`;
+}
+// 되돌리기용: id·createdAt 그대로 다시 넣어요
+const todoData = ({ id, ...data }) => data;
+
+$("#todoForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const input = $("#todoInput");
+  const text = input.value.trim();
+  if (!text) { input.focus(); return; }
+  input.value = "";
+  try { await rstore.set(TODO_PREFIX + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), { text, done: false, by: me || "" }); }
+  catch (err) { console.error(err); input.value = text; toast("저장하지 못했어요"); }
+});
+$("#todoList").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-t]");
+  if (!b) return;
+  const t = todos.find((x) => x.id === b.closest(".todo-item").dataset.id);
+  if (!t) return;
+  try {
+    if (b.dataset.t === "toggle") await rstore.update(t.id, { done: !t.done });
+    else {
+      await rstore.remove(t.id);
+      showUndo(`'${t.text}'을(를) 지웠어요`, () => rstore.restore(t.id, todoData(t)));
+    }
+  } catch (err) { console.error(err); toast("저장하지 못했어요"); }
+});
+$("#todoClear").addEventListener("click", async () => {
+  const done = todos.filter((t) => t.done);
+  if (!done.length || !await askYesNo(`다 한 일 <b>${done.length}개</b>를 지울까요?`)) return;
+  try {
+    await Promise.all(done.map((t) => rstore.remove(t.id)));
+    showUndo(`다 한 일 ${done.length}개를 지웠어요`, () => Promise.all(done.map((t) => rstore.restore(t.id, todoData(t)))));
+  } catch (err) { console.error(err); toast("지우지 못했어요"); }
+});
+
 // ---------- 시작 ----------
 async function start() {
   if (useFirebase && room) {
@@ -2021,6 +2109,8 @@ async function start() {
   rstore.subscribe((list) => {
     profile = list.find((r) => r.id === PROFILE_ID) || null;
     couple = list.find((r) => r.id === COUPLE_ID) || null;
+    todos = list.filter((r) => r.id.startsWith(TODO_PREFIX));
+    drawTodos();
     ratings = Object.fromEntries(list.filter((r) => !r.id.startsWith("_")).map((r) => [r.id, r]));
     drawDday();
     drawProfile();

@@ -102,6 +102,23 @@ header h1 { font-size: 22px; margin: 0; flex: 1; }
 .menu-text small { display: block; font-size: 13px; color: var(--sub); margin-top: 2px; }
 .menu-arrow { font-size: 26px; color: var(--sub); flex: none; }
 
+/* 홈은 스크롤 없이 한 화면에 다 보이게: 화면 높이에 맞춰 사진·글자·메뉴 크기가 자동으로 줄어요 */
+body.at-home { padding-bottom: env(safe-area-inset-bottom); }
+body.at-home #homeView {
+  display: flex; flex-direction: column; overflow: hidden;
+  height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+}
+body.at-home .home-top { flex: none; padding: clamp(10px, 3vh, 30px) 0 clamp(10px, 2vh, 18px); }
+body.at-home .avatar { width: clamp(64px, 14vh, 128px); height: clamp(64px, 14vh, 128px); margin-bottom: clamp(6px, 1.4vh, 14px); font-size: clamp(26px, 4.5vh, 40px); }
+body.at-home .home-title { font-size: clamp(24px, 4vh, 32px); }
+body.at-home .dday { margin-top: clamp(2px, .8vh, 8px); }
+body.at-home .menu { flex: 1; min-height: 0; margin-top: 0; gap: clamp(6px, 1.3vh, 12px); padding-bottom: clamp(10px, 2vh, 16px); }
+body.at-home .menu-item { flex: 1 1 0; min-height: 0; max-height: 80px; padding-top: 0; padding-bottom: 0; }
+body.at-home .menu-emoji { font-size: clamp(22px, 3.6vh, 30px); }
+body.at-home .menu-text b { font-size: clamp(16px, 2.3vh, 18px); }
+body.at-home .menu-text small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
 /* 할 일 체크리스트 (홈 메뉴 맨 아래 → 누르면 창) */
 .todo-add { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
 .todo-due { display: flex; align-items: center; gap: 8px; }
@@ -359,7 +376,7 @@ input[type=date] { display: block; min-height: 48px; -webkit-appearance: none; a
 @keyframes undoBar { from { transform: scaleX(1); } to { transform: scaleX(0); } }
 </style>
 </head>
-<body>
+<body class="at-home">
 <!-- 홈: 앱을 열면 가장 먼저 보이는 화면 -->
 <div class="wrap" id="homeView">
   <div class="home-top">
@@ -2018,6 +2035,7 @@ function go(v) {
   view = v;
   const isList = v === "cafe" || v === "food";
   $("#homeView").hidden = v !== "home";
+  document.body.classList.toggle("at-home", v === "home");   // 홈은 한 화면에 꼭 맞게
   $("#listView").hidden = !isList;
   $("#mapView").hidden = v !== "map";
   window.scrollTo(0, 0);

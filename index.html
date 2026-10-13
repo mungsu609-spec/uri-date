@@ -126,6 +126,9 @@ header h1 { font-size: 22px; margin: 0; flex: 1; }
 .todo-item.done .dbadge { background: var(--bg); color: var(--sub); border-color: var(--line); opacity: .7; }
 .todo-del { flex: none; color: var(--sub); font-size: 16px; padding: 4px 6px; }
 .todo-edit-btn { flex: none; font-size: 15px; padding: 4px 2px; }
+/* 기한 칸: 올해 안에 · 이번 달 안에 · ASAP */
+.chips.due-chips { margin: 0; padding: 0; }
+.due-chips .chip { padding: 6px 12px; }
 /* 할 일 수정: 그 줄이 입력 칸으로 바뀌어요 */
 .todo-edit { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
 .todo-edit .todo-due .btn { padding: 0 12px; font-size: 14px; }
@@ -2050,10 +2053,21 @@ document.addEventListener("click", (e) => {
 });
 
 // ---------- 할 일 체크리스트 (홈 메뉴 맨 아래 → 누르면 창) ----------
-// 안 한 일이 위(기한 가까운 순 → 기한 없는 일은 먼저 적은 순), 다 한 일은 아래로 내려가고 줄이 그어져요
-// 기한(due)은 "YYYY-MM-DD", 안 정하면 빈칸
+// 안 한 일이 위(ASAP → 기한 가까운 순 → 기한 없는 일은 먼저 적은 순), 다 한 일은 아래로 내려가고 줄이 그어져요
+// 기한: dueKind = "date"(날짜 고름) | "month"(이번 달 안에) | "year"(올해 안에) | "asap" | ""(없음)
+//       due = 마감 날 "YYYY-MM-DD" (이번 달 안에 = 그달 마지막 날, 올해 안에 = 12월 31일, ASAP·없음 = 빈칸)
+const DUE_CHIPS = [["year", "올해 안에"], ["month", "이번 달 안에"], ["asap", "ASAP"]];
+const todoKind = (t) => t.dueKind || (t.due ? "date" : "");   // 예전 할 일은 dueKind가 없어요
+const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+function periodEnd(kind) {   // 고른 순간 기준으로 그 기간의 마지막 날
+  const now = new Date();
+  if (kind === "month") return ymd(new Date(now.getFullYear(), now.getMonth() + 1, 0));
+  if (kind === "year") return `${now.getFullYear()}-12-31`;
+  return "";
+}
 const byTime = (a, b) => (a.createdAt || 0) - (b.createdAt || 0);
-const byDue = (a, b) => (!a.due) - (!b.due) || (a.due || "").localeCompare(b.due || "") || byTime(a, b);
+const dueRank = (t) => (todoKind(t) === "asap" ? 0 : t.due ? 1 : 2);
+const byDue = (a, b) => dueRank(a) - dueRank(b) || (a.due || "").localeCompare(b.due || "") || byTime(a, b);
 function dueLeft(due) {   // 오늘부터 기한까지 남은 날 (0 = 오늘, 음수 = 지남)
   const [y, m, d] = due.split("-").map(Number);
   const now = new Date();
@@ -2061,20 +2075,35 @@ function dueLeft(due) {   // 오늘부터 기한까지 남은 날 (0 = 오늘, �
 }
 const dLabel = (left) => (left === 0 ? "D-Day" : left > 0 ? `D-${left}` : `D+${-left}`);
 const dClass = (left) => (left <= 0 ? "now" : left <= 3 ? "soon" : "");
-function dueText(due) {
-  const [y, m, d] = due.split("-").map(Number);
-  return `${y !== new Date().getFullYear() ? y + "년 " : ""}${m}월 ${d}일까지`;
+function dueBadge(t) {   // 오른쪽 배지: ASAP 또는 D-day
+  const k = todoKind(t);
+  if (k === "asap") return { label: "ASAP", cls: "now" };
+  if (!t.due) return null;
+  const left = dueLeft(t.due);
+  return { label: dLabel(left), cls: dClass(left) };
 }
+function dueText(t) {   // 글 아래 작은 글씨
+  const k = todoKind(t);
+  if (k === "asap") return "최대한 빨리";
+  if (!t.due) return "";
+  const [y, m, d] = t.due.split("-").map(Number);
+  const yy = y !== new Date().getFullYear() ? y + "년 " : "";
+  if (k === "year") return `${y}년 안에`;
+  if (k === "month") return `${yy}${m}월 안에`;
+  return `${yy}${m}월 ${d}일까지`;
+}
+const chipsHtml = (on, attr) => `<div class="chips due-chips">${DUE_CHIPS.map(([k, label]) =>
+  `<button type="button" class="chip${on === k ? " on" : ""}" ${attr} data-k="${k}">${label}</button>`).join("")}</div>`;
 let todoRedraw = null;   // 할 일 창이 열려 있으면 목록이 바뀔 때 다시 그림
 function drawTodos() {
-  // 홈 메뉴 작은 글씨: 안 한 일 개수 + 가장 급한 기한
+  // 홈 메뉴 작은 글씨: 안 한 일 개수 + 가장 급한 일
   const open = todos.filter((t) => !t.done).sort(byDue);
-  const urgent = open.find((t) => t.due);
+  const urgent = open.find((t) => dueBadge(t));
   const short = (s) => (s.length > 10 ? s.slice(0, 10) + "…" : s);
+  const ub = urgent && dueBadge(urgent);
   $("#todoSub").innerHTML = !todos.length ? "둘이 같이 보는 체크리스트"
     : !open.length ? "모두 다 했어요 🎉"
-    : `안 한 일 ${open.length}개` + (urgent
-      ? ` · <span class="${dClass(dueLeft(urgent.due)) ? "soon" : ""}">${esc(short(urgent.text))} ${dLabel(dueLeft(urgent.due))}</span>` : "");
+    : `안 한 일 ${open.length}개` + (ub ? ` · <span class="${ub.cls ? "soon" : ""}">${esc(short(urgent.text))} ${ub.label}</span>` : "");
   if (todoRedraw) todoRedraw();
 }
 // 되돌리기용: id·createdAt 그대로 다시 넣어요
@@ -2091,19 +2120,22 @@ function openTodo() {
         <input type="date" id="todoDue">
         <button class="btn main">추가</button>
       </div>
-      <div class="hint" style="margin:0">기한은 안 정해도 돼요. 정하면 D-day가 보여요.</div>
+      ${chipsHtml("", "data-add")}
+      <div class="hint" style="margin:0">기한은 날짜나 위 칸 중 하나로. 안 정해도 돼요.</div>
     </form>
     <div id="todoList"></div>
     <button class="todo-clear" id="todoClear" hidden></button>`);
+  let addKind = "";   // 추가 칸에서 고른 기한 칸 (올해·이번 달·ASAP), 날짜를 고르면 빈칸
   // 수정 중인 할 일 (한 번에 하나). 쓰는 중인 글자는 draft에 두어서 애인이 목록을 바꿔 다시 그려져도 안 지워져요
   let editing = null, draft = null;
   const editHtml = (t) => `<div class="todo-item editing" data-id="${esc(t.id)}"><div class="todo-edit">
       <input type="text" class="te-text" value="${esc(draft.text)}" maxlength="100" enterkeyhint="done" autocomplete="off" aria-label="할 일">
       <div class="todo-due">
         <label>📅 기한</label>
-        <input type="date" class="te-due" value="${esc(draft.due)}" aria-label="기한">
+        <input type="date" class="te-due" value="${draft.kind === "date" ? esc(draft.due) : ""}" aria-label="기한">
         <button class="btn" data-t="nodue">기한 빼기</button>
       </div>
+      ${chipsHtml(draft.kind, `data-t="kind"`)}
       <div class="todo-edit-btns"><button class="btn" data-t="cancel">취소</button><button class="btn main" data-t="save">저장</button></div>
     </div></div>`;
   const draw = () => {
@@ -2115,12 +2147,12 @@ function openTodo() {
     $("#todoList").innerHTML = todos.length
       ? [...open, ...done].map((t) => {
           if (t.id === editing) return editHtml(t);
-          const left = t.due ? dueLeft(t.due) : null;
-          const sub = [t.by, t.due && dueText(t.due)].filter(Boolean).map(esc).join(" · ");
+          const badge = dueBadge(t);
+          const sub = [t.by, dueText(t)].filter(Boolean).map(esc).join(" · ");
           return `<div class="todo-item${t.done ? " done" : ""}" data-id="${esc(t.id)}">
           <button class="todo-check" data-t="toggle" aria-label="${t.done ? "안 한 걸로" : "다 했어요"}"></button>
           <button class="todo-text" data-t="toggle"><span>${esc(t.text)}</span>${sub ? `<small>${sub}</small>` : ""}</button>
-          ${left === null ? "" : `<span class="dbadge ${dClass(left)}">${dLabel(left)}</span>`}
+          ${badge ? `<span class="dbadge ${badge.cls}">${badge.label}</span>` : ""}
           <button class="todo-edit-btn" data-t="edit" aria-label="수정">✏️</button>
           <button class="todo-del" data-t="del" aria-label="지우기">✕</button>
         </div>`;
@@ -2133,31 +2165,50 @@ function openTodo() {
   todoRedraw = draw;
   draw();
 
+  // 기한 칸: 다시 누르면 꺼지고, 날짜를 고르면 칸이 꺼지고, 칸을 누르면 날짜가 비워져요
+  const markChips = (box, k) => box.querySelectorAll(".chip").forEach((c) => c.classList.toggle("on", c.dataset.k === k));
+  $("#todoForm").addEventListener("click", (e) => {
+    const c = e.target.closest(".chip[data-add]");
+    if (!c) return;
+    addKind = addKind === c.dataset.k ? "" : c.dataset.k;
+    if (addKind) $("#todoDue").value = "";
+    markChips($("#todoForm"), addKind);
+  });
+  $("#todoDue").addEventListener("input", () => { if ($("#todoDue").value) { addKind = ""; markChips($("#todoForm"), ""); } });
   $("#todoForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     const input = $("#todoInput"), dueEl = $("#todoDue");
-    const text = input.value.trim(), due = dueEl.value || "";
+    const text = input.value.trim();
     if (!text) { input.focus(); toast("할 일을 적어 주세요"); return; }
-    input.value = ""; dueEl.value = "";
-    try { await rstore.set(TODO_PREFIX + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), { text, due, done: false, by: me || "" }); }
-    catch (err) { console.error(err); input.value = text; dueEl.value = due; toast("저장하지 못했어요"); }
+    const dueKind = addKind || (dueEl.value ? "date" : "");
+    const due = addKind ? periodEnd(addKind) : dueEl.value || "";
+    const was = { date: dueEl.value, kind: addKind };
+    input.value = ""; dueEl.value = ""; addKind = ""; markChips($("#todoForm"), "");
+    try { await rstore.set(TODO_PREFIX + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), { text, due, dueKind, done: false, by: me || "" }); }
+    catch (err) {
+      console.error(err); toast("저장하지 못했어요");
+      input.value = text; dueEl.value = was.date; addKind = was.kind; markChips($("#todoForm"), addKind);
+    }
   });
   const saveEdit = async () => {
     const t = todos.find((x) => x.id === editing);
     if (!t) return;
     const text = draft.text.trim();
     if (!text) { $(".te-text").focus(); toast("할 일을 적어 주세요"); return; }
-    const due = draft.due || "";
+    const { due, kind: dueKind } = draft;
     editing = draft = null;
     draw();
-    if (text === t.text && due === (t.due || "")) return;
-    try { await rstore.update(t.id, { text, due }); toast("고쳤어요"); }
+    if (text === t.text && due === (t.due || "") && dueKind === todoKind(t)) return;
+    try { await rstore.update(t.id, { text, due, dueKind }); toast("고쳤어요"); }
     catch (err) { console.error(err); toast("저장하지 못했어요"); }
   };
   $("#todoList").addEventListener("input", (e) => {
     if (!draft) return;
     if (e.target.classList.contains("te-text")) draft.text = e.target.value;
-    if (e.target.classList.contains("te-due")) draft.due = e.target.value;
+    if (e.target.classList.contains("te-due")) {
+      draft.due = e.target.value; draft.kind = e.target.value ? "date" : "";
+      markChips($(".todo-item.editing"), "");
+    }
   });
   $("#todoList").addEventListener("keydown", (e) => {
     if (e.key === "Enter" && e.target.classList.contains("te-text") && !e.isComposing) { e.preventDefault(); saveEdit(); }
@@ -2169,14 +2220,21 @@ function openTodo() {
     if (!t) return;
     const act = b.dataset.t;
     if (act === "edit") {
-      editing = t.id; draft = { text: t.text, due: t.due || "" };
+      editing = t.id; draft = { text: t.text, due: t.due || "", kind: todoKind(t) };
       draw();
       const input = $(".te-text");
       input.focus(); input.setSelectionRange(input.value.length, input.value.length);
       return;
     }
     if (act === "cancel") { editing = draft = null; draw(); return; }
-    if (act === "nodue") { draft.due = ""; $(".te-due").value = ""; return; }
+    if (act === "nodue") { draft.due = ""; draft.kind = ""; $(".te-due").value = ""; markChips($(".todo-item.editing"), ""); return; }
+    if (act === "kind") {
+      const k = draft.kind === b.dataset.k ? "" : b.dataset.k;
+      draft.kind = k; draft.due = periodEnd(k);
+      $(".te-due").value = "";
+      markChips($(".todo-item.editing"), k);
+      return;
+    }
     if (act === "save") { saveEdit(); return; }
     try {
       if (act === "toggle") await rstore.update(t.id, { done: !t.done });
@@ -2195,7 +2253,6 @@ function openTodo() {
     } catch (err) { console.error(err); toast("지우지 못했어요"); }
   });
 }
-
 
 // ---------- 시작 ----------
 async function start() {

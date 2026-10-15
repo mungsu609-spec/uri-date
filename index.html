@@ -2368,7 +2368,7 @@ function openTodo(tab = todoTab) {
 
 // ---------- 캘린더 (할 일 창 → 📅 캘린더) ----------
 // 날짜를 고른 할 일 + 기념일·일정 + 사귄 날로 센 우리 기념일(100일 단위·주년)이 달력에 보여요.
-// 기념일·일정은 "_event_"로 시작하는 칸에 저장해요 {title, date, type: "plan"(일정) | "anniv"(기념일, 매년)}
+// 기념일·일정은 "_event_"로 시작하는 칸에 저장해요 {title, date, type: "plan"(일정) | "anniv"(기념일, 매년), place(장소, 선택)}
 // — 할 일 목록은 "_todo_"만 보니까 기념일·일정은 목록에 안 나와요
 const EVENT_PREFIX = "_event_";
 let events = [];
@@ -2421,7 +2421,8 @@ function openCalendar() {
     <div class="cal-day" id="calDay"></div>
     <form class="ev-form" id="evForm">
       <div class="ev-form-title" id="evFormTitle">＋ 기념일 · 일정 추가</div>
-      <input type="text" id="evTitle" placeholder="예: 병민 생일, 부산 여행" maxlength="60" enterkeyhint="done" autocomplete="off">
+      <input type="text" id="evTitle" placeholder="예: 병민 생일, 부산 여행" maxlength="60" enterkeyhint="next" autocomplete="off">
+      <input type="text" id="evPlace" placeholder="📍 장소 (안 적어도 돼요)" maxlength="60" enterkeyhint="done" autocomplete="off">
       <div class="chips" id="evTypes">${EV_TYPES.map(([k, emoji, label]) =>
         `<button type="button" class="chip${k === "plan" ? " on" : ""}" data-type="${k}">${emoji} ${label}</button>`).join("")}</div>
       <div class="todo-due">
@@ -2437,7 +2438,7 @@ function openCalendar() {
   const markType = () => $("#evTypes").querySelectorAll(".chip").forEach((c) => c.classList.toggle("on", c.dataset.type === evType));
   const resetForm = () => {
     evEditing = null; evType = "plan"; markType();
-    $("#evTitle").value = ""; $("#evDate").value = calSel;
+    $("#evTitle").value = ""; $("#evPlace").value = ""; $("#evDate").value = calSel;
     $("#evFormTitle").textContent = "＋ 기념일 · 일정 추가";
     $("#evSubmit").textContent = "추가";
     $("#evCancel").hidden = true;
@@ -2478,10 +2479,11 @@ function openCalendar() {
       }
       const e = it.e;
       const ey = e.date.slice(0, 4);
-      const sub = e.type === "anniv" ? `기념일 · 매년${calSel.slice(0, 4) > ey ? ` (${ey}년부터)` : ""}` : "일정";
+      const sub = (e.type === "anniv" ? `기념일 · 매년${calSel.slice(0, 4) > ey ? ` (${ey}년부터)` : ""}` : "일정") + (e.place ? ` · 📍 ${esc(e.place)}` : "");
       return `<div class="todo-item" data-eid="${esc(e.id)}">
         <span class="ci-emoji">${evEmoji(e.type)}</span>
         <span class="todo-text"><span>${esc(e.title)}</span><small>${sub}</small></span>
+        ${e.place ? `<button class="btn sm naver" data-c="evmap" aria-label="네이버지도에서 보기">N 지도</button>` : ""}
         <button class="todo-edit-btn" data-c="evedit" aria-label="수정">✏️</button>
         <button class="todo-del" data-c="evdel" aria-label="지우기">✕</button>
       </div>`;
@@ -2518,9 +2520,10 @@ function openCalendar() {
     const row = b.closest("[data-eid]");
     const ev = row && events.find((x) => x.id === row.dataset.eid);
     if (!ev) return;
+    if (act === "evmap") { openNaver(ev.place); return; }
     if (act === "evedit") {
       evEditing = ev.id; evType = ev.type === "anniv" ? "anniv" : "plan"; markType();
-      $("#evTitle").value = ev.title; $("#evDate").value = ev.date;
+      $("#evTitle").value = ev.title; $("#evPlace").value = ev.place || ""; $("#evDate").value = ev.date;
       $("#evFormTitle").textContent = "✏️ 기념일 · 일정 고치기";
       $("#evSubmit").textContent = "저장";
       $("#evCancel").hidden = false;
@@ -2540,12 +2543,15 @@ function openCalendar() {
     if (c) { evType = c.dataset.type; markType(); }
   });
   $("#evCancel").addEventListener("click", () => { resetForm(); });
+  $("#evTitle").addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); $("#evPlace").focus(); }
+  });
   $("#evForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     const title = $("#evTitle").value.trim(), date = $("#evDate").value;
     if (!title) { $("#evTitle").focus(); toast("이름을 적어 주세요"); return; }
     if (!date) { toast("날짜를 골라 주세요"); return; }
-    const data = { title, date, type: evType };
+    const data = { title, date, type: evType, place: $("#evPlace").value.trim() };
     const id = evEditing;
     calSel = date; calMonth = date.slice(0, 7);
     resetForm();

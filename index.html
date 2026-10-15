@@ -201,6 +201,8 @@ body.at-home .menu-text small { white-space: nowrap; overflow: hidden; text-over
 .cal-cell.today .cal-num { color: var(--accent); font-weight: 800; }
 .cal-cell.sel { border-color: var(--accent); }
 .cal-ev { display: block; font-size: 10px; line-height: 1.4; padding: 0 3px; border-radius: 4px; white-space: nowrap; overflow: hidden; text-overflow: clip; }
+.cal-ev.holi { color: #e05a5a; font-weight: 700; padding: 0 1px; }
+.cal-legend .holi { color: #e05a5a; }
 .cal-ev.plan { background: var(--plan-soft); color: var(--plan); }
 .cal-ev.anniv { background: var(--accent-soft); color: var(--accent); }
 .cal-ev.auto { background: var(--accent); color: #fff; }
@@ -2375,6 +2377,34 @@ let events = [];
 const EV_TYPES = [["plan", "📌", "일정"], ["anniv", "🎂", "기념일 (매년)"]];
 const evEmoji = (type) => (type === "anniv" ? "🎂" : "📌");
 const WEEK = ["일", "월", "화", "수", "목", "금", "토"];
+// 한국 공휴일 (대체공휴일·선거일 포함, 2025~2030년). 2031년부터는 이 표에 더 넣어야 해요.
+// 설·추석·부처님오신날은 음력이라 해마다 날짜가 달라서 표로 적어 둬요. 노동절·제헌절은 2026년부터 공휴일
+const HOLIDAYS = (() => {
+  const fixed = [["01-01", "신정"], ["03-01", "삼일절"], ["05-05", "어린이날"], ["06-06", "현충일"],
+    ["08-15", "광복절"], ["10-03", "개천절"], ["10-09", "한글날"], ["12-25", "성탄절"]];
+  const fixed26 = [["05-01", "노동절"], ["07-17", "제헌절"]];
+  const sub = "대체공휴일";
+  const byYear = {
+    2025: { "01-27": "임시공휴일", "01-28": "설 연휴", "01-29": "설날", "01-30": "설 연휴", "03-03": sub, "05-05": "어린이날·부처님오신날", "05-06": sub,
+      "06-03": "대통령선거", "10-05": "추석 연휴", "10-06": "추석", "10-07": "추석 연휴", "10-08": sub },
+    2026: { "02-16": "설 연휴", "02-17": "설날", "02-18": "설 연휴", "03-02": sub, "05-24": "부처님오신날", "05-25": sub, "06-03": "지방선거",
+      "08-17": sub, "09-24": "추석 연휴", "09-25": "추석", "09-26": "추석 연휴", "10-05": sub },
+    2027: { "02-06": "설 연휴", "02-07": "설날", "02-08": "설 연휴", "02-09": sub, "05-03": sub, "05-13": "부처님오신날", "07-19": sub,
+      "08-16": sub, "09-14": "추석 연휴", "09-15": "추석", "09-16": "추석 연휴", "10-04": sub, "10-11": sub, "12-27": sub },
+    2028: { "01-26": "설 연휴", "01-27": "설날", "01-28": "설 연휴", "04-12": "국회의원선거", "05-02": "부처님오신날",
+      "10-02": "추석 연휴", "10-03": "개천절·추석", "10-04": "추석 연휴", "10-05": sub },
+    2029: { "02-12": "설 연휴", "02-13": "설날", "02-14": "설 연휴", "05-07": sub, "05-20": "부처님오신날", "05-21": sub,
+      "09-21": "추석 연휴", "09-22": "추석", "09-23": "추석 연휴", "09-24": sub },
+    2030: { "02-02": "설 연휴", "02-03": "설날", "02-04": "설 연휴", "02-05": sub, "05-06": sub, "05-09": "부처님오신날",
+      "09-11": "추석 연휴", "09-12": "추석", "09-13": "추석 연휴" },
+  };
+  const out = {};
+  for (let y = 2025; y <= 2030; y++) {
+    fixed.concat(y >= 2026 ? fixed26 : []).forEach(([md, n]) => { out[`${y}-${md}`] = n; });
+    Object.entries(byYear[y]).forEach(([md, n]) => { out[`${y}-${md}`] = n; });
+  }
+  return out;
+})();
 let calMonth = null, calSel = null;   // 보고 있는 달 "YYYY-MM", 고른 날 "YYYY-MM-DD"
 function coupleAnniv(y, m, d) {   // 사귄 날 기준 자동 기념일
   if (!couple || !couple.start) return "";
@@ -2385,9 +2415,10 @@ function coupleAnniv(y, m, d) {   // 사귄 날 기준 자동 기념일
   if (y > sy && m === sm && d === sd) return `${y - sy}주년`;
   return "";
 }
-function itemsOn(ds) {   // 그날 보일 것: 우리 기념일 → 기념일 → 일정 → 할 일
+function itemsOn(ds) {   // 그날 보일 것: 공휴일 → 우리 기념일 → 기념일 → 일정 → 할 일
   const [y, m, d] = ds.split("-").map(Number);
   const out = [];
+  if (HOLIDAYS[ds]) out.push({ kind: "holi", title: HOLIDAYS[ds] });
   const auto = coupleAnniv(y, m, d);
   if (auto) out.push({ kind: "auto", title: auto });
   events.filter((e) => (e.type === "anniv" ? e.date.slice(5) === ds.slice(5) && e.date <= ds : e.date === ds))
@@ -2417,7 +2448,7 @@ function openCalendar() {
     </div>
     <div class="cal-week">${WEEK.map((w, i) => `<span class="${i === 0 ? "sun" : i === 6 ? "sat" : ""}">${w}</span>`).join("")}</div>
     <div class="cal-grid" id="calGrid"></div>
-    <div class="cal-legend"><span>💕 우리 기념일</span><span>🎂 기념일</span><span>📌 일정</span><span>✅ 할 일</span></div>
+    <div class="cal-legend"><span class="holi">🇰🇷 공휴일</span><span>💕 우리 기념일</span><span>🎂 기념일</span><span>📌 일정</span><span>✅ 할 일</span></div>
     <div class="cal-day" id="calDay"></div>
     <form class="ev-form" id="evForm">
       <div class="ev-form-title" id="evFormTitle">＋ 기념일 · 일정 추가</div>
@@ -2457,7 +2488,7 @@ function openCalendar() {
       const wd = (first + d - 1) % 7;
       const items = itemsOn(ds);
       const shown = items.length > 3 ? items.slice(0, 2) : items;
-      cells.push(`<button type="button" class="cal-cell${wd === 0 ? " sun" : wd === 6 ? " sat" : ""}${ds === today ? " today" : ""}${ds === calSel ? " sel" : ""}" data-d="${ds}">
+      cells.push(`<button type="button" class="cal-cell${wd === 0 || HOLIDAYS[ds] ? " sun" : wd === 6 ? " sat" : ""}${ds === today ? " today" : ""}${ds === calSel ? " sel" : ""}" data-d="${ds}">
         <span class="cal-num">${d}</span>
         ${shown.map((it) => `<span class="cal-ev ${it.kind}${it.t ? ` ${WHO_CLS[whoOf(it.t)]}${it.t.done ? " done" : ""}` : ""}">${esc(it.title)}</span>`).join("")}
         ${items.length > shown.length ? `<span class="cal-more">+${items.length - shown.length}</span>` : ""}
@@ -2469,6 +2500,7 @@ function openCalendar() {
     $("#calDay").hidden = !items;
     if (!items) return;
     $("#calDay").innerHTML = `<div class="cal-day-head">${dayTitle(calSel)}</div>` + (items.length ? items.map((it) => {
+      if (it.kind === "holi") return `<div class="todo-item"><span class="ci-emoji">🇰🇷</span><span class="todo-text"><span>${esc(it.title)}</span><small>공휴일</small></span></div>`;
       if (it.kind === "auto") return `<div class="todo-item"><span class="ci-emoji">💕</span><span class="todo-text"><span>${esc(it.title)}</span><small>사귄 날로 센 우리 기념일</small></span></div>`;
       if (it.t) {
         const t = it.t;

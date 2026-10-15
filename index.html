@@ -24,6 +24,13 @@
   --done: #7aa889;
   --done-soft: #e3f1e7;
   --shadow: 0 2px 10px rgba(120, 60, 50, .08);
+  /* 누가 할 일인지(병민·가영)와 캘린더 일정 색 */
+  --bm: #4a7fd0;
+  --bm-soft: #e3edfb;
+  --gy: #9b62d1;
+  --gy-soft: #f0e6fa;
+  --plan: #2a9283;
+  --plan-soft: #ddf3ef;
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -37,6 +44,12 @@
     --done: #8fc19e;
     --done-soft: #2a3a2f;
     --shadow: none;
+    --bm: #8db2ee;
+    --bm-soft: #26334a;
+    --gy: #c7a2ec;
+    --gy-soft: #382b47;
+    --plan: #74cdbf;
+    --plan-soft: #1f3a36;
   }
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -153,6 +166,58 @@ body.at-home .menu-text small { white-space: nowrap; overflow: hidden; text-over
 .todo-edit-btns .btn { flex: 1; padding: 10px; font-size: 15px; }
 .todo-clear { display: block; margin: 10px auto 0; font-size: 13px; color: var(--sub); text-decoration: underline; }
 .menu-text small .soon { color: var(--accent); font-weight: 600; }
+/* 누가 할 일인지: 같이 · 병민 · 가영 */
+.who-chips { margin: 0; padding: 0; align-items: center; }
+.who-label { flex: none; font-size: 14px; color: var(--sub); margin-right: 2px; }
+.who-chips .chip { padding: 6px 14px; }
+.chip.who.both.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.chip.who.bm.on { background: var(--bm); border-color: var(--bm); color: #fff; }
+.chip.who.gy.on { background: var(--gy); border-color: var(--gy); color: #fff; }
+.who-tag { font-style: normal; display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px; margin-right: 6px; vertical-align: 1px; white-space: nowrap; }
+.who-tag.both { background: var(--accent-soft); color: var(--accent); }
+.who-tag.bm { background: var(--bm-soft); color: var(--bm); }
+.who-tag.gy { background: var(--gy-soft); color: var(--gy); }
+.todo-item.done .who-tag { opacity: .6; }
+/* 할 일 창 위쪽: 목록 / 캘린더 바꾸기 */
+.todo-tabs { display: flex; gap: 4px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 4px; margin-bottom: 12px; }
+.todo-tabs button { flex: 1; padding: 8px; border-radius: 10px; font-size: 15px; font-weight: 600; color: var(--sub); }
+.todo-tabs button.on { background: var(--accent); color: #fff; }
+/* 캘린더 */
+.cal-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.cal-head b { flex: 1; text-align: center; font-size: 18px; }
+.cal-head .icon-btn { width: 38px; height: 38px; font-size: 22px; line-height: 1; }
+.cal-head .btn { flex: none; }
+.cal-week, .cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; }
+.cal-week { font-size: 12px; color: var(--sub); text-align: center; margin-bottom: 3px; }
+.cal-week .sun, .cal-cell.sun .cal-num { color: #e05a5a; }
+.cal-week .sat, .cal-cell.sat .cal-num { color: #4f7fd6; }
+.cal-cell {
+  min-height: 76px; min-width: 0; padding: 3px 2px; border-radius: 10px; background: var(--card); border: 2px solid transparent;
+  display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 2px; overflow: hidden; text-align: left;
+}
+.cal-cell.blank { background: none; pointer-events: none; }
+.cal-num { font-size: 13px; font-weight: 600; text-align: center; line-height: 1.3; }
+.cal-cell.today { background: var(--accent-soft); }
+.cal-cell.today .cal-num { color: var(--accent); font-weight: 800; }
+.cal-cell.sel { border-color: var(--accent); }
+.cal-ev { display: block; font-size: 10px; line-height: 1.4; padding: 0 3px; border-radius: 4px; white-space: nowrap; overflow: hidden; text-overflow: clip; }
+.cal-ev.plan { background: var(--plan-soft); color: var(--plan); }
+.cal-ev.anniv { background: var(--accent-soft); color: var(--accent); }
+.cal-ev.auto { background: var(--accent); color: #fff; }
+.cal-ev.todo { background: var(--bg); color: var(--text); border-left: 3px solid var(--accent); }
+.cal-ev.todo.bm { border-left-color: var(--bm); }
+.cal-ev.todo.gy { border-left-color: var(--gy); }
+.cal-ev.todo.done { text-decoration: line-through; opacity: .55; }
+.cal-more { font-size: 10px; color: var(--sub); text-align: center; line-height: 1.2; }
+.cal-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 10px; font-size: 12px; color: var(--sub); margin-top: 8px; }
+.cal-day { margin-top: 12px; background: var(--card); border-radius: 16px; padding: 12px 14px 4px; box-shadow: var(--shadow); }
+.cal-day-head { font-weight: 700; margin-bottom: 2px; }
+.cal-day .msg { padding: 10px 0 14px; }
+.ci-emoji { flex: none; width: 24px; text-align: center; font-size: 18px; }
+.ev-form { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
+.ev-form-title { font-weight: 700; font-size: 15px; }
+.ev-form .chips { margin: 0; padding: 0; }
+.ev-form .chip { padding: 6px 14px; }
 
 .banner { background: var(--accent-soft); border-radius: 14px; padding: 10px 14px; font-size: 14px; margin-bottom: 12px; }
 .banner b { color: var(--accent); }
@@ -413,7 +478,7 @@ input[type=date] { display: block; min-height: 48px; -webkit-appearance: none; a
     </button>
     <button class="menu-item" id="btnTodo">
       <span class="menu-emoji">✅</span>
-      <span class="menu-text"><b>할 일</b><small id="todoSub">둘이 같이 보는 체크리스트</small></span>
+      <span class="menu-text"><b>할 일</b><small id="todoSub">둘이 같이 보는 체크리스트 · 캘린더</small></span>
       <span class="menu-arrow">›</span>
     </button>
   </div>
@@ -2112,6 +2177,24 @@ function dueText(t) {   // 글 아래 작은 글씨
 }
 const chipsHtml = (on, attr) => `<div class="chips due-chips">${DUE_CHIPS.map(([k, label]) =>
   `<button type="button" class="chip${on === k ? " on" : ""}" ${attr} data-k="${k}">${label}</button>`).join("")}</div>`;
+// 누가 할 일인지: who = "같이" | "병민" | "가영" (예전 할 일은 '같이')
+const WHO = ["같이", "병민", "가영"];
+const WHO_CLS = { 같이: "both", 병민: "bm", 가영: "gy" };
+const whoOf = (t) => (WHO.includes(t.who) ? t.who : "같이");
+const whoTag = (w) => `<em class="who-tag ${WHO_CLS[w]}">${w}</em>`;
+const whoChipsHtml = (on, attr) => `<div class="chips who-chips"><span class="who-label">🙋 누가</span>${WHO.map((w) =>
+  `<button type="button" class="chip who ${WHO_CLS[w]}${on === w ? " on" : ""}" ${attr} data-w="${w}">${w}</button>`).join("")}</div>`;
+const markWho = (box, w) => box.querySelectorAll(".chip.who").forEach((c) => c.classList.toggle("on", c.dataset.w === w));
+// 할 일 창 위쪽 목록/캘린더 바꾸기 (마지막에 본 쪽을 이 폰이 기억해요)
+let todoTab = ls.get("dateapp.todoTab", "list");
+const todoTabsHtml = (on) => `<div class="todo-tabs">${[["list", "📋 목록"], ["cal", "📅 캘린더"]].map(([k, label]) =>
+  `<button type="button" class="${on === k ? "on" : ""}" data-tab="${k}">${label}</button>`).join("")}</div>`;
+function bindTodoTabs() {
+  $(".todo-tabs").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-tab]");
+    if (b && b.dataset.tab !== todoTab) openTodo(b.dataset.tab);
+  });
+}
 let todoRedraw = null;   // 할 일 창이 열려 있으면 목록이 바뀔 때 다시 그림
 function drawTodos() {
   // 홈 메뉴 작은 글씨: 안 한 일 개수 + 가장 급한 일
@@ -2119,7 +2202,7 @@ function drawTodos() {
   const urgent = open.find((t) => dueBadge(t));
   const short = (s) => (s.length > 10 ? s.slice(0, 10) + "…" : s);
   const ub = urgent && dueBadge(urgent);
-  $("#todoSub").innerHTML = !todos.length ? "둘이 같이 보는 체크리스트"
+  $("#todoSub").innerHTML = !todos.length ? "둘이 같이 보는 체크리스트 · 캘린더"
     : !open.length ? "모두 다 했어요 🎉"
     : `안 한 일 ${open.length}개` + (ub ? ` · <span class="${ub.cls ? "soon" : ""}">${esc(short(urgent.text))} ${ub.label}</span>` : "");
   if (todoRedraw) todoRedraw();
@@ -2127,10 +2210,13 @@ function drawTodos() {
 // 되돌리기용: id·createdAt 그대로 다시 넣어요
 const todoData = ({ id, ...data }) => data;
 
-$("#btnTodo").addEventListener("click", openTodo);
-function openTodo() {
+$("#btnTodo").addEventListener("click", () => openTodo());
+function openTodo(tab = todoTab) {
+  todoTab = tab; ls.set("dateapp.todoTab", tab);
+  if (tab === "cal") { openCalendar(); return; }
   openSheet(`
     <h2><span>✅ 할 일</span><small class="hint" id="todoCount" style="margin:0"></small><button class="close">✕</button></h2>
+    ${todoTabsHtml("list")}
     <form class="todo-add" id="todoForm">
       <input type="text" id="todoInput" placeholder="예: 영화 예매하기" maxlength="100" enterkeyhint="done" autocomplete="off">
       <div class="todo-due">
@@ -2140,10 +2226,13 @@ function openTodo() {
       </div>
       ${chipsHtml("", "data-add")}
       <div class="hint" style="margin:0">기한은 날짜나 위 칸 중 하나로. 안 정해도 돼요.</div>
+      ${whoChipsHtml("같이", "data-addwho")}
     </form>
     <div id="todoList"></div>
     <button class="todo-clear" id="todoClear" hidden></button>`);
+  bindTodoTabs();
   let addKind = "";   // 추가 칸에서 고른 기한 칸 (올해·이번 달·ASAP), 날짜를 고르면 빈칸
+  let addWho = "같이";   // 추가 칸에서 고른 사람
   // 수정 중인 할 일 (한 번에 하나). 쓰는 중인 글자는 draft에 두어서 애인이 목록을 바꿔 다시 그려져도 안 지워져요
   let editing = null, draft = null;
   const editHtml = (t) => `<div class="todo-item editing" data-id="${esc(t.id)}"><div class="todo-edit">
@@ -2154,6 +2243,7 @@ function openTodo() {
         <button class="btn" data-t="nodue">기한 빼기</button>
       </div>
       ${chipsHtml(draft.kind, `data-t="kind"`)}
+      ${whoChipsHtml(draft.who, `data-t="who"`)}
       <div class="todo-edit-btns"><button class="btn" data-t="cancel">취소</button><button class="btn main" data-t="save">저장</button></div>
     </div></div>`;
   const draw = () => {
@@ -2166,10 +2256,10 @@ function openTodo() {
       ? [...open, ...done].map((t) => {
           if (t.id === editing) return editHtml(t);
           const badge = dueBadge(t);
-          const sub = [t.by, dueText(t)].filter(Boolean).map(esc).join(" · ");
+          const sub = esc(dueText(t));
           return `<div class="todo-item${t.done ? " done" : ""}" data-id="${esc(t.id)}">
           <button class="todo-check" data-t="toggle" aria-label="${t.done ? "안 한 걸로" : "다 했어요"}"></button>
-          <button class="todo-text" data-t="toggle"><span>${esc(t.text)}</span>${sub ? `<small>${sub}</small>` : ""}</button>
+          <button class="todo-text" data-t="toggle">${whoTag(whoOf(t))}<span>${esc(t.text)}</span>${sub ? `<small>${sub}</small>` : ""}</button>
           ${badge ? `<span class="dbadge ${badge.cls}">${badge.label}</span>` : ""}
           <button class="todo-edit-btn" data-t="edit" aria-label="수정">✏️</button>
           <button class="todo-del" data-t="del" aria-label="지우기">✕</button>
@@ -2184,8 +2274,10 @@ function openTodo() {
   draw();
 
   // 기한 칸: 다시 누르면 꺼지고, 날짜를 고르면 칸이 꺼지고, 칸을 누르면 날짜가 비워져요
-  const markChips = (box, k) => box.querySelectorAll(".chip").forEach((c) => c.classList.toggle("on", c.dataset.k === k));
+  const markChips = (box, k) => box.querySelectorAll(".due-chips .chip").forEach((c) => c.classList.toggle("on", c.dataset.k === k));
   $("#todoForm").addEventListener("click", (e) => {
+    const w = e.target.closest(".chip[data-addwho]");
+    if (w) { addWho = w.dataset.w; markWho($("#todoForm"), addWho); return; }
     const c = e.target.closest(".chip[data-add]");
     if (!c) return;
     addKind = addKind === c.dataset.k ? "" : c.dataset.k;
@@ -2200,12 +2292,13 @@ function openTodo() {
     if (!text) { input.focus(); toast("할 일을 적어 주세요"); return; }
     const dueKind = addKind || (dueEl.value ? "date" : "");
     const due = addKind ? periodEnd(addKind) : dueEl.value || "";
+    const who = addWho;
     const was = { date: dueEl.value, kind: addKind };
-    input.value = ""; dueEl.value = ""; addKind = ""; markChips($("#todoForm"), "");
-    try { await rstore.set(TODO_PREFIX + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), { text, due, dueKind, done: false, by: me || "" }); }
+    input.value = ""; dueEl.value = ""; addKind = ""; markChips($("#todoForm"), ""); addWho = "같이"; markWho($("#todoForm"), addWho);
+    try { await rstore.set(TODO_PREFIX + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), { text, due, dueKind, who, done: false, by: me || "" }); }
     catch (err) {
       console.error(err); toast("저장하지 못했어요");
-      input.value = text; dueEl.value = was.date; addKind = was.kind; markChips($("#todoForm"), addKind);
+      input.value = text; dueEl.value = was.date; addKind = was.kind; markChips($("#todoForm"), addKind); addWho = who; markWho($("#todoForm"), who);
     }
   });
   const saveEdit = async () => {
@@ -2213,11 +2306,11 @@ function openTodo() {
     if (!t) return;
     const text = draft.text.trim();
     if (!text) { $(".te-text").focus(); toast("할 일을 적어 주세요"); return; }
-    const { due, kind: dueKind } = draft;
+    const { due, kind: dueKind, who } = draft;
     editing = draft = null;
     draw();
-    if (text === t.text && due === (t.due || "") && dueKind === todoKind(t)) return;
-    try { await rstore.update(t.id, { text, due, dueKind }); toast("고쳤어요"); }
+    if (text === t.text && due === (t.due || "") && dueKind === todoKind(t) && who === whoOf(t)) return;
+    try { await rstore.update(t.id, { text, due, dueKind, who }); toast("고쳤어요"); }
     catch (err) { console.error(err); toast("저장하지 못했어요"); }
   };
   $("#todoList").addEventListener("input", (e) => {
@@ -2238,7 +2331,7 @@ function openTodo() {
     if (!t) return;
     const act = b.dataset.t;
     if (act === "edit") {
-      editing = t.id; draft = { text: t.text, due: t.due || "", kind: todoKind(t) };
+      editing = t.id; draft = { text: t.text, due: t.due || "", kind: todoKind(t), who: whoOf(t) };
       draw();
       const input = $(".te-text");
       input.focus(); input.setSelectionRange(input.value.length, input.value.length);
@@ -2253,6 +2346,7 @@ function openTodo() {
       markChips($(".todo-item.editing"), k);
       return;
     }
+    if (act === "who") { draft.who = b.dataset.w; markWho($(".todo-item.editing"), draft.who); return; }
     if (act === "save") { saveEdit(); return; }
     try {
       if (act === "toggle") await rstore.update(t.id, { done: !t.done });
@@ -2272,6 +2366,200 @@ function openTodo() {
   });
 }
 
+// ---------- 캘린더 (할 일 창 → 📅 캘린더) ----------
+// 날짜를 고른 할 일 + 기념일·일정 + 사귄 날로 센 우리 기념일(100일 단위·주년)이 달력에 보여요.
+// 기념일·일정은 "_event_"로 시작하는 칸에 저장해요 {title, date, type: "plan"(일정) | "anniv"(기념일, 매년)}
+// — 할 일 목록은 "_todo_"만 보니까 기념일·일정은 목록에 안 나와요
+const EVENT_PREFIX = "_event_";
+let events = [];
+const EV_TYPES = [["plan", "📌", "일정"], ["anniv", "🎂", "기념일 (매년)"]];
+const evEmoji = (type) => (type === "anniv" ? "🎂" : "📌");
+const WEEK = ["일", "월", "화", "수", "목", "금", "토"];
+let calMonth = null, calSel = null;   // 보고 있는 달 "YYYY-MM", 고른 날 "YYYY-MM-DD"
+function coupleAnniv(y, m, d) {   // 사귄 날 기준 자동 기념일
+  if (!couple || !couple.start) return "";
+  const [sy, sm, sd] = couple.start.split("-").map(Number);
+  const days = Math.round((Date.UTC(y, m - 1, d) - Date.UTC(sy, sm - 1, sd)) / 864e5) + 1;
+  if (days === 1) return "사귄 날";
+  if (days > 1 && days % 100 === 0) return `${days}일`;
+  if (y > sy && m === sm && d === sd) return `${y - sy}주년`;
+  return "";
+}
+function itemsOn(ds) {   // 그날 보일 것: 우리 기념일 → 기념일 → 일정 → 할 일
+  const [y, m, d] = ds.split("-").map(Number);
+  const out = [];
+  const auto = coupleAnniv(y, m, d);
+  if (auto) out.push({ kind: "auto", title: auto });
+  events.filter((e) => (e.type === "anniv" ? e.date.slice(5) === ds.slice(5) && e.date <= ds : e.date === ds))
+    .sort((a, b) => (a.type === "anniv" ? 0 : 1) - (b.type === "anniv" ? 0 : 1) || byTime(a, b))
+    .forEach((e) => out.push({ kind: e.type === "anniv" ? "anniv" : "plan", title: e.title, e }));
+  todos.filter((t) => todoKind(t) === "date" && t.due === ds)
+    .sort((a, b) => a.done - b.done || byTime(a, b))
+    .forEach((t) => out.push({ kind: "todo", title: t.text, t }));
+  return out;
+}
+const dayTitle = (ds) => {
+  const [y, m, d] = ds.split("-").map(Number);
+  return `${y !== new Date().getFullYear() ? y + "년 " : ""}${m}월 ${d}일 (${WEEK[new Date(y, m - 1, d).getDay()]})`;
+};
+function openCalendar() {
+  const today = ymd(new Date());
+  if (!calSel) calSel = today;
+  calMonth = calSel.slice(0, 7);
+  openSheet(`
+    <h2><span>✅ 할 일</span><button class="close">✕</button></h2>
+    ${todoTabsHtml("cal")}
+    <div class="cal-head">
+      <button class="icon-btn" data-c="prev" aria-label="지난달">‹</button>
+      <b id="calTitle"></b>
+      <button class="icon-btn" data-c="next" aria-label="다음 달">›</button>
+      <button class="btn sm" data-c="today">오늘</button>
+    </div>
+    <div class="cal-week">${WEEK.map((w, i) => `<span class="${i === 0 ? "sun" : i === 6 ? "sat" : ""}">${w}</span>`).join("")}</div>
+    <div class="cal-grid" id="calGrid"></div>
+    <div class="cal-legend"><span>💕 우리 기념일</span><span>🎂 기념일</span><span>📌 일정</span><span>✅ 할 일</span></div>
+    <div class="cal-day" id="calDay"></div>
+    <form class="ev-form" id="evForm">
+      <div class="ev-form-title" id="evFormTitle">＋ 기념일 · 일정 추가</div>
+      <input type="text" id="evTitle" placeholder="예: 병민 생일, 부산 여행" maxlength="60" enterkeyhint="done" autocomplete="off">
+      <div class="chips" id="evTypes">${EV_TYPES.map(([k, emoji, label]) =>
+        `<button type="button" class="chip${k === "plan" ? " on" : ""}" data-type="${k}">${emoji} ${label}</button>`).join("")}</div>
+      <div class="todo-due">
+        <label for="evDate">📅 날짜</label>
+        <input type="date" id="evDate" value="${calSel}">
+        <button class="btn main" id="evSubmit">추가</button>
+      </div>
+      <button type="button" class="btn" id="evCancel" hidden>취소</button>
+      <div class="hint" style="margin:0">기념일은 매년 같은 날에 보여요. 기념일·일정은 할 일 목록에는 안 나와요.<br>할 일은 날짜를 고른 것만 캘린더에 보여요.</div>
+    </form>`);
+  bindTodoTabs();
+  let evType = "plan", evEditing = null;   // 고치는 중인 기념일·일정 id (없으면 새로 추가)
+  const markType = () => $("#evTypes").querySelectorAll(".chip").forEach((c) => c.classList.toggle("on", c.dataset.type === evType));
+  const resetForm = () => {
+    evEditing = null; evType = "plan"; markType();
+    $("#evTitle").value = ""; $("#evDate").value = calSel;
+    $("#evFormTitle").textContent = "＋ 기념일 · 일정 추가";
+    $("#evSubmit").textContent = "추가";
+    $("#evCancel").hidden = true;
+  };
+  const draw = () => {
+    if (!$("#calGrid")) { todoRedraw = null; return; }
+    if (evEditing && !events.some((e) => e.id === evEditing)) resetForm();   // 고치던 게 지워졌으면 그만
+    const [y, m] = calMonth.split("-").map(Number);
+    $("#calTitle").textContent = `${y}년 ${m}월`;
+    const first = new Date(y, m - 1, 1).getDay();
+    const last = new Date(y, m, 0).getDate();
+    const cells = [];
+    for (let i = 0; i < first; i++) cells.push(`<div class="cal-cell blank"></div>`);
+    for (let d = 1; d <= last; d++) {
+      const ds = `${calMonth}-${String(d).padStart(2, "0")}`;
+      const wd = (first + d - 1) % 7;
+      const items = itemsOn(ds);
+      const shown = items.length > 3 ? items.slice(0, 2) : items;
+      cells.push(`<button type="button" class="cal-cell${wd === 0 ? " sun" : wd === 6 ? " sat" : ""}${ds === today ? " today" : ""}${ds === calSel ? " sel" : ""}" data-d="${ds}">
+        <span class="cal-num">${d}</span>
+        ${shown.map((it) => `<span class="cal-ev ${it.kind}${it.t ? ` ${WHO_CLS[whoOf(it.t)]}${it.t.done ? " done" : ""}` : ""}">${esc(it.title)}</span>`).join("")}
+        ${items.length > shown.length ? `<span class="cal-more">+${items.length - shown.length}</span>` : ""}
+      </button>`);
+    }
+    $("#calGrid").innerHTML = cells.join("");
+    // 고른 날 자세히 (다른 달을 보고 있으면 숨김)
+    const items = calSel.startsWith(calMonth) ? itemsOn(calSel) : null;
+    $("#calDay").hidden = !items;
+    if (!items) return;
+    $("#calDay").innerHTML = `<div class="cal-day-head">${dayTitle(calSel)}</div>` + (items.length ? items.map((it) => {
+      if (it.kind === "auto") return `<div class="todo-item"><span class="ci-emoji">💕</span><span class="todo-text"><span>${esc(it.title)}</span><small>사귄 날로 센 우리 기념일</small></span></div>`;
+      if (it.t) {
+        const t = it.t;
+        return `<div class="todo-item${t.done ? " done" : ""}" data-tid="${esc(t.id)}">
+          <button class="todo-check" data-c="ttoggle" aria-label="${t.done ? "안 한 걸로" : "다 했어요"}"></button>
+          <button class="todo-text" data-c="ttoggle">${whoTag(whoOf(t))}<span>${esc(t.text)}</span><small>할 일</small></button>
+        </div>`;
+      }
+      const e = it.e;
+      const ey = e.date.slice(0, 4);
+      const sub = e.type === "anniv" ? `기념일 · 매년${calSel.slice(0, 4) > ey ? ` (${ey}년부터)` : ""}` : "일정";
+      return `<div class="todo-item" data-eid="${esc(e.id)}">
+        <span class="ci-emoji">${evEmoji(e.type)}</span>
+        <span class="todo-text"><span>${esc(e.title)}</span><small>${sub}</small></span>
+        <button class="todo-edit-btn" data-c="evedit" aria-label="수정">✏️</button>
+        <button class="todo-del" data-c="evdel" aria-label="지우기">✕</button>
+      </div>`;
+    }).join("") : `<div class="msg">이 날은 아직 아무것도 없어요</div>`);
+  };
+  todoRedraw = draw;
+  draw();
+
+  const pick = (ds) => {   // 날짜 고르기 (그 달로 이동)
+    calSel = ds; calMonth = ds.slice(0, 7);
+    if (!evEditing) $("#evDate").value = ds;
+    draw();
+  };
+  const moveMonth = (n) => {
+    const [y, m] = calMonth.split("-").map(Number);
+    calMonth = ymd(new Date(y, m - 1 + n, 1)).slice(0, 7);
+    draw();
+  };
+  $("#sheet .wrap").addEventListener("click", async (e) => {
+    const cell = e.target.closest(".cal-cell[data-d]");
+    if (cell) { pick(cell.dataset.d); return; }
+    const b = e.target.closest("[data-c]");
+    if (!b) return;
+    const act = b.dataset.c;
+    if (act === "prev") return moveMonth(-1);
+    if (act === "next") return moveMonth(1);
+    if (act === "today") return pick(today);
+    if (act === "ttoggle") {
+      const t = todos.find((x) => x.id === b.closest("[data-tid]").dataset.tid);
+      if (!t) return;
+      try { await rstore.update(t.id, { done: !t.done }); } catch (err) { console.error(err); toast("저장하지 못했어요"); }
+      return;
+    }
+    const row = b.closest("[data-eid]");
+    const ev = row && events.find((x) => x.id === row.dataset.eid);
+    if (!ev) return;
+    if (act === "evedit") {
+      evEditing = ev.id; evType = ev.type === "anniv" ? "anniv" : "plan"; markType();
+      $("#evTitle").value = ev.title; $("#evDate").value = ev.date;
+      $("#evFormTitle").textContent = "✏️ 기념일 · 일정 고치기";
+      $("#evSubmit").textContent = "저장";
+      $("#evCancel").hidden = false;
+      $("#evForm").scrollIntoView({ block: "center" });
+      $("#evTitle").focus();
+      return;
+    }
+    if (act === "evdel") {
+      try {
+        await rstore.remove(ev.id);
+        showUndo(`'${ev.title}'을(를) 지웠어요`, () => rstore.restore(ev.id, todoData(ev)));
+      } catch (err) { console.error(err); toast("지우지 못했어요"); }
+    }
+  });
+  $("#evTypes").addEventListener("click", (e) => {
+    const c = e.target.closest(".chip[data-type]");
+    if (c) { evType = c.dataset.type; markType(); }
+  });
+  $("#evCancel").addEventListener("click", () => { resetForm(); });
+  $("#evForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const title = $("#evTitle").value.trim(), date = $("#evDate").value;
+    if (!title) { $("#evTitle").focus(); toast("이름을 적어 주세요"); return; }
+    if (!date) { toast("날짜를 골라 주세요"); return; }
+    const data = { title, date, type: evType };
+    const id = evEditing;
+    calSel = date; calMonth = date.slice(0, 7);
+    resetForm();
+    draw();
+    try {
+      if (id) { await rstore.update(id, data); toast("고쳤어요"); }
+      else {
+        await rstore.set(EVENT_PREFIX + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), { ...data, by: me || "" });
+        toast(data.type === "anniv" ? "기념일을 넣었어요 🎂" : "일정을 넣었어요 📌");
+      }
+    } catch (err) { console.error(err); toast("저장하지 못했어요"); }
+  });
+}
+
 // ---------- 시작 ----------
 async function start() {
   if (useFirebase && room) {
@@ -2285,6 +2573,7 @@ async function start() {
     profile = list.find((r) => r.id === PROFILE_ID) || null;
     couple = list.find((r) => r.id === COUPLE_ID) || null;
     todos = list.filter((r) => r.id.startsWith(TODO_PREFIX));
+    events = list.filter((r) => r.id.startsWith(EVENT_PREFIX) && r.date);
     drawTodos();
     ratings = Object.fromEntries(list.filter((r) => !r.id.startsWith("_")).map((r) => [r.id, r]));
     drawDday();

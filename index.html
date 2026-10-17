@@ -9,11 +9,13 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="병가’s 데이트">
 <meta name="theme-color" content="#fff7f3">
+<script>try { const t = JSON.parse(localStorage.getItem("dateapp.theme")); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch {}</script>
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-180.png">
 <link rel="manifest" href="manifest.webmanifest">
 <style>
 :root {
+  color-scheme: light;
   --bg: #fff7f3;
   --card: #ffffff;
   --text: #3a2a2a;
@@ -32,8 +34,10 @@
   --plan: #2a9283;
   --plan-soft: #ddf3ef;
 }
+/* 화면 모드: 설정에서 '자동'이면 아이폰 설정을 따르고, '라이트'·'다크'를 고르면 그 모드로 (html의 data-theme) */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
     --bg: #1d1717;
     --card: #2a2222;
     --text: #f3e8e6;
@@ -51,6 +55,25 @@
     --plan: #74cdbf;
     --plan-soft: #1f3a36;
   }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #1d1717;
+  --card: #2a2222;
+  --text: #f3e8e6;
+  --sub: #b29e9a;
+  --line: #3d3232;
+  --accent: #f08a9b;
+  --accent-soft: #4a2a31;
+  --done: #8fc19e;
+  --done-soft: #2a3a2f;
+  --shadow: none;
+  --bm: #8db2ee;
+  --bm-soft: #26334a;
+  --gy: #c7a2ec;
+  --gy-soft: #382b47;
+  --plan: #74cdbf;
+  --plan-soft: #1f3a36;
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; }
@@ -1927,6 +1950,19 @@ function openRated(tab) {
   hint(); draw();
 }
 
+// ---------- 화면 모드 (자동 / 라이트 / 다크) ----------
+// 이 폰에만 저장돼요 (애인 폰은 따로 골라요)
+const THEMES = [["auto", "📱 자동"], ["light", "☀️ 라이트"], ["dark", "🌙 다크"]];
+function applyTheme(t) {
+  if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+  else delete document.documentElement.dataset.theme;
+  // 맨 위 상태 표시줄 색도 배경색에 맞춰요
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.content = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim() || "#fff7f3";
+}
+applyTheme(ls.get("dateapp.theme", "auto"));
+matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", () => applyTheme(ls.get("dateapp.theme", "auto")));
+
 function openSettings(first = false) {
   openSheet(`
     <h2><span>${first === true ? "처음 설정" : "설정"}</span>${first === true ? "" : `<button class="close">✕</button>`}</h2>
@@ -1944,6 +1980,9 @@ function openSettings(first = false) {
       <input type="date" id="sStart" value="${esc(couple && couple.start)}">`}
     <label>내 이름 (누가 추가했는지 보여 줘요)</label>
     <input type="text" id="sMe" value="${esc(me)}" placeholder="예: 쵸키맘">
+    <label>화면 모드 (이 폰에만 적용돼요)</label>
+    <div class="chips" id="sTheme" style="margin-bottom:0">${THEMES.map(([k, t]) => `<button class="chip${ls.get("dateapp.theme", "auto") === k ? " on" : ""}" data-theme="${k}">${t}</button>`).join("")}</div>
+    <div class="hint">자동은 아이폰 설정(라이트/다크)을 그대로 따라가요.</div>
     ${useFirebase ? `
       <label>커플 코드</label>
       ${room ? `
@@ -1982,6 +2021,13 @@ function openSettings(first = false) {
       if (v) { await rstore.set(COUPLE_ID, { start: v, by: me || "" }); toast("사귄 날을 저장했어요 💕"); }
       else { await rstore.remove(COUPLE_ID); toast("사귄 날을 지웠어요"); }
     } catch (err) { console.error(err); toast("저장하지 못했어요"); }
+  };
+  $("#sTheme").onclick = (e) => {
+    const b = e.target.closest("#sTheme .chip");
+    if (!b) return;
+    ls.set("dateapp.theme", b.dataset.theme);
+    applyTheme(b.dataset.theme);
+    $("#sTheme").querySelectorAll(".chip").forEach((c) => c.classList.toggle("on", c === b));
   };
   const saveMe = () => { me = $("#sMe").value.trim(); ls.set("dateapp.me", me); };
   const switchRoom = (code) => { ls.set("dateapp.room", code); location.href = location.pathname + "?room=" + encodeURIComponent(code); };

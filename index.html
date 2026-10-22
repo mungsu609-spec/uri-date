@@ -537,6 +537,7 @@ input[type=date] { display: block; min-height: 48px; -webkit-appearance: none; a
         <option value="added">추가순</option>
         <option value="dist">거리순</option>
         <option value="near">내 위치순</option>
+        <option value="place" data-short="검색 위치">검색한 위치순</option>
       </select>
     </label>
   </div>
@@ -785,15 +786,18 @@ const TODO_PREFIX = "_todo_";
 let todos = [];
 let couple = null;      // { start: "2024-05-01", by }
 
-// ---------- 정렬 (가나다순 / 추가순 / 거리순 / 내 위치순) ----------
+// ---------- 정렬 (가나다순 / 추가순 / 거리순 / 내 위치순 / 검색한 위치순) ----------
 // 거리순 기준: 부산 금정구 금강로 431 (구서백리명가에덴)
 const HOME = { name: "금강로 431", x: 129.088312623812, y: 35.2462173475132 };
 let sortBy = ls.get("dateapp.sort", "name");
 // 내 위치순 기준: 폰의 현재 위치. 이 폰 안에서 거리 계산에만 쓰고 어디에도 저장하지 않아요.
 let myPos = null;        // { x: 경도, y: 위도 }
 let locating = false;
+// 검색한 위치순 기준: 카카오에서 검색해 고른 장소(역·동네·가게 등). 이 폰에만 기억해요.
+let placePos = ls.get("dateapp.placePos", null);   // { name, address, x, y }
+if (sortBy === "place" && !placePos) sortBy = "name";
 // 지금 정렬의 기준점 (거리를 안 쓰는 정렬이거나 아직 위치를 모르면 null)
-const distBase = () => (sortBy === "dist" ? HOME : sortBy === "near" ? myPos : null);
+const distBase = () => (sortBy === "dist" ? HOME : sortBy === "near" ? myPos : sortBy === "place" ? placePos : null);
 function distFrom(c, base = distBase()) {
   if (!base || !c.x || !c.y) return null;
   const R = 6371000, rad = (d) => (d * Math.PI) / 180;
@@ -959,12 +963,15 @@ $("#list").addEventListener("click", (e) => {
 
 const markSort = () => {
   $("#sortSel").value = sortBy;
-  $("#sortLabel").textContent = $("#sortSel").selectedOptions[0].text;
+  const o = $("#sortSel").selectedOptions[0];
+  $("#sortLabel").textContent = o.dataset.short || o.text;   // 버튼 글씨가 길면 칩 줄이 가려져서 짧게
   const h = $("#distHint");
-  h.style.display = sortBy === "dist" || sortBy === "near" ? "" : "none";
+  h.style.display = sortBy === "dist" || sortBy === "near" || sortBy === "place" ? "" : "none";
   if (sortBy === "dist") h.innerHTML = "📍 거리는 금강로 431(구서백리명가에덴)에서 잰 직선거리예요";
   if (sortBy === "near") h.innerHTML = locating ? "📍 내 위치를 찾는 중…"
     : myPos ? `📍 지금 내 위치에서 잰 직선거리예요 · <button class="link" id="relocate">위치 다시 찾기</button>` : "";
+  if (sortBy === "place") h.innerHTML = placePos
+    ? `📍 <b>${esc(placePos.name)}</b>에서 잰 직선거리예요 · <button class="link" id="replace">다른 위치 검색</button>` : "";
 };
 const setSort = (v) => { sortBy = v; ls.set("dateapp.sort", v); markSort(); render(); };
 
@@ -992,9 +999,68 @@ $("#sortSel").addEventListener("change", (e) => {
   const v = e.target.value;
   setSort(v);
   if (v === "near") locate(prevSort === "near" ? "name" : prevSort);
+  if (v === "place") openPlacePick(prevSort === "place" ? "name" : prevSort);
   prevSort = v;
 });
-$("#distHint").addEventListener("click", (e) => { if (e.target.id === "relocate") locate("name", true); });
+$("#distHint").addEventListener("click", (e) => {
+  if (e.target.id === "relocate") locate("name", true);
+  if (e.target.id === "replace") openPlacePick("name");
+});
+
+// 검색한 위치순: 장소를 검색해서 고르면 그곳에서 가까운 순으로 보여 줘요
+// 고르지 않고 닫으면, 전에 고른 곳이 있으면 그대로 / 없으면 이전 정렬로 돌아가요
+async function openPlacePick(fallback) {
+  const back = () => { if (sortBy === "place" && !placePos) { setSort(fallback); prevSort = fallback; } };
+  if (!(await kakaoReady)) { toast("카카오 키가 없어서 위치를 검색할 수 없어요"); return back(); }
+  openSheet(`
+    <h2><span>📍 어디에서 가까운 순?</span><button class="close">✕</button></h2>
+    <div class="row">
+      <input type="text" id="pq" placeholder="예: 서면역, 해운대, 부산대" enterkeyhint="search" value="${esc(placePos ? placePos.name : "")}">
+      <button class="btn main" id="pqGo">검색</button>
+    </div>
+    <div class="hint">역·동네·건물·가게 이름이나 주소를 써요. 고른 곳에서 잰 직선거리로 정렬해요.</div>
+    <div id="pqResults" style="margin-top:12px"></div>`);
+  sheetOnClose = back;
+  const q = $("#pq"), box = $("#pqResults");
+  let found = [];
+  const show = (list) => {
+    found = list;
+    box.innerHTML = list.length ? list.map((p, i) => `
+      <button class="result" data-i="${i}">
+        <div class="result-main">
+          <div class="result-name">${esc(p.name)}</div>
+          <div class="result-sub">${esc(p.address)}${p.cat ? " · " + esc(p.cat) : ""}</div>
+        </div>
+      </button>`).join("") : `<div class="msg">검색 결과가 없어요. 다른 이름으로 찾아 보세요.</div>`;
+  };
+  const go = () => {
+    const text = q.value.trim();
+    if (!text) return;
+    box.innerHTML = `<div class="msg">찾는 중…</div>`;
+    places.keywordSearch(text, (data, status) => {
+      if (status === kakao.maps.services.Status.OK) return show(data.map((p) => ({
+        name: p.place_name, address: p.road_address_name || p.address_name, cat: p.category_name.split(" > ").pop(), x: +p.x, y: +p.y })));
+      // 장소 이름으로 안 나오면 주소로 한 번 더 찾아요
+      geocoder.addressSearch(text, (res, st) => show(st === kakao.maps.services.Status.OK
+        ? res.map((r) => ({ name: r.address_name, address: (r.road_address && r.road_address.address_name) || r.address_name, x: +r.x, y: +r.y })) : []));
+    });
+  };
+  $("#pqGo").onclick = go;
+  q.addEventListener("keydown", (e) => { if (e.key === "Enter") go(); });
+  box.onclick = (e) => {
+    const r = e.target.closest(".result");
+    if (!r) return;
+    const p = found[+r.dataset.i];
+    placePos = { name: p.name, address: p.address, x: p.x, y: p.y };
+    ls.set("dateapp.placePos", placePos);
+    sheetOnClose = null;
+    closeSheet();
+    prevSort = "place";
+    setSort("place");
+    window.scrollTo({ top: 0 });
+  };
+  setTimeout(() => q.focus(), 50);
+}
 // 앱을 다시 열면 그사이 이동했을 수 있으니 위치를 새로 찾아요
 document.addEventListener("visibilitychange", () => { if (!document.hidden && (view === "cafe" || view === "food") && sortBy === "near" && !locating) locate("name", true); });
 
@@ -1007,12 +1073,19 @@ $("#filters").addEventListener("click", (e) => {
 });
 
 // ---------- 아래에서 올라오는 창 ----------
+// 창이 닫힐 때 한 번 할 일 (창을 새로 열면 없어져요)
+let sheetOnClose = null;
 function openSheet(html) {
+  sheetOnClose = null;
   $("#sheet").innerHTML = `<div class="grab"></div><div class="wrap">${html}</div>`;
   $("#sheetBg").classList.add("open");
   $("#sheet").scrollTop = 0;
 }
-function closeSheet() { $("#sheetBg").classList.remove("open"); }
+function closeSheet() {
+  $("#sheetBg").classList.remove("open");
+  const f = sheetOnClose; sheetOnClose = null;
+  if (f) f();
+}
 $("#sheetBg").addEventListener("click", (e) => {
   if (e.target.id === "sheetBg" || e.target.closest(".close")) closeSheet();
 });

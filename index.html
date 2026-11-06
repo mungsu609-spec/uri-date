@@ -188,6 +188,7 @@ body.at-home .menu-text small { white-space: nowrap; overflow: hidden; text-over
 .todo-edit-btns { display: flex; gap: 8px; }
 .todo-edit-btns .btn { flex: 1; padding: 10px; font-size: 15px; }
 .todo-clear { display: block; margin: 10px auto 0; font-size: 13px; color: var(--sub); text-decoration: underline; }
+.todo-clear[hidden] { display: none; }
 .menu-text small .soon { color: var(--accent); font-weight: 600; }
 /* 누가 할 일인지: 같이 · 병민 · 가영 */
 .who-chips { margin: 0; padding: 0; align-items: center; }
@@ -203,7 +204,8 @@ body.at-home .menu-text small { white-space: nowrap; overflow: hidden; text-over
 .todo-item.done .who-tag { opacity: .6; }
 /* 할 일 창 위쪽: 목록 / 캘린더 바꾸기 */
 .todo-tabs { display: flex; gap: 4px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 4px; margin-bottom: 12px; }
-.todo-tabs button { flex: 1; padding: 8px; border-radius: 10px; font-size: 15px; font-weight: 600; color: var(--sub); }
+.todo-tabs button { flex: 1; min-width: 0; padding: 6px 2px; border-radius: 10px; font-size: 13px; font-weight: 600; color: var(--sub); white-space: nowrap; display: flex; flex-direction: column; align-items: center; gap: 1px; }
+.todo-tabs button i { font-style: normal; font-size: 18px; line-height: 1.2; }
 .todo-tabs button.on { background: var(--accent); color: #fff; }
 /* 캘린더 */
 .cal-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
@@ -239,6 +241,30 @@ body.at-home .menu-text small { white-space: nowrap; overflow: hidden; text-over
 .cal-day-head { font-weight: 700; margin-bottom: 2px; }
 .cal-day .msg { padding: 10px 0 14px; }
 .ci-emoji { flex: none; width: 24px; text-align: center; font-size: 18px; }
+/* 미니 기능 → 🎡 룰렛 */
+.roul-box { position: relative; width: min(280px, 78vw); aspect-ratio: 1; margin: 22px auto 10px; }
+.roul-box svg { width: 100%; height: 100%; display: block; filter: drop-shadow(0 4px 10px rgba(0,0,0,.15)); }
+.roul-wheel { transform-origin: 50% 50%; }
+.roul-pin { position: absolute; left: 50%; top: -16px; transform: translateX(-50%); width: 0; height: 0;
+  border-left: 14px solid transparent; border-right: 14px solid transparent; border-top: 26px solid var(--text); z-index: 2; }
+.roul-center { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 22%; aspect-ratio: 1; border-radius: 50%; padding: 0;
+  background: var(--card); border: 3px solid var(--text); font-size: 15px; font-weight: 800; color: var(--text); box-shadow: 0 2px 6px rgba(0,0,0,.2); }
+.roul-result { text-align: center; min-height: 34px; font-size: 20px; font-weight: 800; margin-bottom: 10px; word-break: keep-all; overflow-wrap: anywhere; }
+.roul-result small { display: block; font-size: 13px; font-weight: 500; color: var(--sub); padding-top: 8px; }
+.roul-result .tag { display: inline-block; padding: 6px 18px; border-radius: 999px; color: #222; font-size: 20px; font-weight: 800; }
+.roul-dot { flex: none; width: 18px; height: 18px; border-radius: 50%; border: 1px solid rgba(0,0,0,.12); }
+.roul-item.hit .todo-text span { font-weight: 800; }
+/* 미니 기능 → 🎟 소원권 */
+.wish-score { display: flex; align-items: center; justify-content: center; gap: 10px; background: var(--card); border-radius: 18px; padding: 14px 10px; box-shadow: var(--shadow); margin-bottom: 14px; }
+.wish-score .side { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; font-weight: 700; font-size: 15px; }
+.wish-score .side b { font-size: 44px; line-height: 1; font-weight: 800; }
+.wish-score .bm b, .wish-score .bm span { color: var(--bm); }
+.wish-score .gy b, .wish-score .gy span { color: var(--gy); }
+.wish-score .colon { font-size: 34px; font-weight: 800; color: var(--sub); padding-top: 18px; }
+.wish-sec { font-size: 13px; font-weight: 700; color: var(--sub); margin: 14px 0 2px; }
+.wish-item.over .todo-text, .wish-item.over .ci-emoji { opacity: .55; }
+.wish-item.used .todo-text span:not(.who-tag) { text-decoration: line-through; }
+.wish-use { flex: none; }
 .ev-form { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
 .ev-form-title { font-weight: 700; font-size: 15px; }
 .ev-form .chips { margin: 0; padding: 0; }
@@ -502,8 +528,8 @@ input[type=date] { display: block; min-height: 48px; -webkit-appearance: none; a
       <span class="menu-arrow">›</span>
     </button>
     <button class="menu-item" id="btnTodo">
-      <span class="menu-emoji">✅</span>
-      <span class="menu-text"><b>할 일</b><small id="todoSub">둘이 같이 보는 체크리스트 · 캘린더</small></span>
+      <span class="menu-emoji">🧩</span>
+      <span class="menu-text"><b>미니 기능</b><small id="todoSub">체크리스트 · 캘린더 · 룰렛 · 소원권</small></span>
       <span class="menu-arrow">›</span>
     </button>
   </div>
@@ -2308,8 +2334,9 @@ const whoChipsHtml = (on, attr) => `<div class="chips who-chips"><span class="wh
 const markWho = (box, w) => box.querySelectorAll(".chip.who").forEach((c) => c.classList.toggle("on", c.dataset.w === w));
 // 할 일 창 위쪽 목록/캘린더 바꾸기 (마지막에 본 쪽을 이 폰이 기억해요)
 let todoTab = ls.get("dateapp.todoTab", "list");
-const todoTabsHtml = (on) => `<div class="todo-tabs">${[["list", "📋 목록"], ["cal", "📅 캘린더"]].map(([k, label]) =>
-  `<button type="button" class="${on === k ? "on" : ""}" data-tab="${k}">${label}</button>`).join("")}</div>`;
+const MINI_TABS = [["list", "📋", "체크리스트"], ["cal", "📅", "캘린더"], ["roul", "🎡", "룰렛"], ["wish", "🎟", "소원권"]];
+const todoTabsHtml = (on) => `<div class="todo-tabs">${MINI_TABS.map(([k, emoji, label]) =>
+  `<button type="button" class="${on === k ? "on" : ""}" data-tab="${k}"><i>${emoji}</i>${label}</button>`).join("")}</div>`;
 function bindTodoTabs() {
   $(".todo-tabs").addEventListener("click", (e) => {
     const b = e.target.closest("[data-tab]");
@@ -2323,7 +2350,7 @@ function drawTodos() {
   const urgent = open.find((t) => dueBadge(t));
   const short = (s) => (s.length > 10 ? s.slice(0, 10) + "…" : s);
   const ub = urgent && dueBadge(urgent);
-  $("#todoSub").innerHTML = !todos.length ? "둘이 같이 보는 체크리스트 · 캘린더"
+  $("#todoSub").innerHTML = !todos.length ? "체크리스트 · 캘린더 · 룰렛 · 소원권"
     : !open.length ? "모두 다 했어요 🎉"
     : `안 한 일 ${open.length}개` + (ub ? ` · <span class="${ub.cls ? "soon" : ""}">${esc(short(urgent.text))} ${ub.label}</span>` : "");
   if (todoRedraw) todoRedraw();
@@ -2334,9 +2361,12 @@ const todoData = ({ id, ...data }) => data;
 $("#btnTodo").addEventListener("click", () => openTodo());
 function openTodo(tab = todoTab) {
   todoTab = tab; ls.set("dateapp.todoTab", tab);
+  if (!MINI_TABS.some(([k]) => k === tab)) tab = todoTab = "list";
   if (tab === "cal") { openCalendar(); return; }
+  if (tab === "roul") { openRoulette(); return; }
+  if (tab === "wish") { openWish(); return; }
   openSheet(`
-    <h2><span>✅ 할 일</span><small class="hint" id="todoCount" style="margin:0"></small><button class="close">✕</button></h2>
+    <h2><span>🧩 미니 기능</span><small class="hint" id="todoCount" style="margin:0"></small><button class="close">✕</button></h2>
     ${todoTabsHtml("list")}
     <form class="todo-add" id="todoForm">
       <input type="text" id="todoInput" placeholder="예: 영화 예매하기" maxlength="100" enterkeyhint="done" autocomplete="off">
@@ -2557,7 +2587,7 @@ function openCalendar() {
   if (!calSel) calSel = today;
   calMonth = calSel.slice(0, 7);
   openSheet(`
-    <h2><span>✅ 할 일</span><button class="close">✕</button></h2>
+    <h2><span>🧩 미니 기능</span><button class="close">✕</button></h2>
     ${todoTabsHtml("cal")}
     <div class="cal-head">
       <button class="icon-btn" data-c="prev" aria-label="지난달">‹</button>
@@ -2717,6 +2747,259 @@ function openCalendar() {
   });
 }
 
+// ---------- 룰렛 (미니 기능 → 🎡 룰렛) ----------
+// 룰렛 칸은 "_roul_"로 시작하는 칸에 저장해요 {text, color(0~9, 칸마다 다른 색)}. 둘이 같이 봐요. 최대 10개.
+const ROUL_PREFIX = "_roul_";
+const ROUL_MAX = 10;
+const ROUL_COLORS = ["#ff8fab", "#ffb86b", "#ffe066", "#a3e07c", "#5cc8b8", "#74b9f5", "#9d9ff2", "#c99af0", "#f59ad8", "#c9ab8c"];
+let roulItems = [];
+let roulRot = 0;          // 지금 돌아가 있는 각도 (이 폰에서만)
+let roulSpinning = false;
+let roulLast = null;      // 방금 나온 결과 { id, text, color }
+const roulColor = (it) => ROUL_COLORS[(it.color ?? 0) % ROUL_COLORS.length];
+function roulNextColor() {   // 아직 안 쓴 색 중 첫 번째
+  const used = new Set(roulItems.map((it) => it.color));
+  for (let i = 0; i < ROUL_COLORS.length; i++) if (!used.has(i)) return i;
+  return roulItems.length % ROUL_COLORS.length;
+}
+function roulWheelSvg(list) {
+  const n = list.length, R = 100;
+  const pt = (deg, r) => { const a = (deg * Math.PI) / 180; return `${(r * Math.sin(a)).toFixed(2)},${(-r * Math.cos(a)).toFixed(2)}`; };
+  if (!n) return `<circle r="${R}" fill="var(--line)"/>`;
+  const step = 360 / n;
+  const fs = n <= 4 ? 13 : n <= 7 ? 11 : 9.5;
+  const maxLen = n <= 4 ? 8 : n <= 7 ? 7 : 6;
+  return list.map((it, i) => {
+    const a0 = i * step, a1 = (i + 1) * step, mid = a0 + step / 2;
+    const shape = n === 1 ? `<circle r="${R}" fill="${roulColor(it)}"/>`
+      : `<path d="M0,0 L${pt(a0, R)} A${R},${R} 0 ${step > 180 ? 1 : 0} 1 ${pt(a1, R)} Z" fill="${roulColor(it)}" stroke="#fff" stroke-width="1.2"/>`;
+    const t = it.text.length > maxLen ? it.text.slice(0, maxLen) + "…" : it.text;
+    const pos = n === 1 ? `translate(0,-58)` : `rotate(${mid - 90}) translate(${R * 0.62},0)`;
+    return `${shape}<text transform="${pos}" text-anchor="middle" dominant-baseline="central" font-size="${fs}" font-weight="700" fill="#2b2b2b">${esc(t)}</text>`;
+  }).join("");
+}
+function openRoulette() {
+  openSheet(`
+    <h2><span>🧩 미니 기능</span><button class="close">✕</button></h2>
+    ${todoTabsHtml("roul")}
+    <div class="roul-box">
+      <div class="roul-pin"></div>
+      <svg class="roul-wheel" id="roulWheel" viewBox="-104 -104 208 208"></svg>
+      <button type="button" class="roul-center" id="roulSpin" aria-label="룰렛 돌리기">GO</button>
+    </div>
+    <div class="roul-result" id="roulResult"></div>
+    <button type="button" class="btn main" id="roulSpin2" style="width:100%">🎡 룰렛 돌리기</button>
+    <form class="ev-form" id="roulForm">
+      <div class="ev-form-title"><span id="roulFormTitle">＋ 룰렛 내용 추가</span> <small class="hint" id="roulCount"></small></div>
+      <div class="todo-due">
+        <input type="text" id="roulInput" placeholder="예: 떡볶이, 영화 보기" maxlength="20" enterkeyhint="done" autocomplete="off" style="flex:1;min-width:0">
+        <button class="btn main" id="roulSubmit">추가</button>
+      </div>
+      <button type="button" class="btn" id="roulCancel" hidden>취소</button>
+    </form>
+    <div id="roulList" style="margin-top:6px"></div>`);
+  bindTodoTabs();
+  let editing = null, wheelKey = "";
+  const setRot = (deg, anim) => {
+    const w = $("#roulWheel");
+    w.style.transition = anim ? "transform 4.2s cubic-bezier(.17,.67,.12,1)" : "none";
+    w.style.transform = `rotate(${deg}deg)`;
+  };
+  const resetForm = () => {
+    editing = null;
+    $("#roulInput").value = "";
+    $("#roulFormTitle").textContent = "＋ 룰렛 내용 추가";
+    $("#roulSubmit").textContent = "추가";
+    $("#roulCancel").hidden = true;
+  };
+  const draw = () => {
+    if (!$("#roulWheel")) { todoRedraw = null; return; }
+    const list = [...roulItems].sort(byTime);
+    if (editing && !list.some((it) => it.id === editing)) resetForm();
+    // 돌아가는 중에는 원판을 다시 그리지 않아요 (멈춘 뒤 다시 그림)
+    const key = list.map((it) => it.id + it.text + it.color).join("|");
+    if (!roulSpinning && key !== wheelKey) { wheelKey = key; $("#roulWheel").innerHTML = roulWheelSvg(list); setRot(roulRot, false); }
+    const full = list.length >= ROUL_MAX && !editing;
+    $("#roulCount").textContent = `${list.length}/${ROUL_MAX}`;
+    $("#roulInput").disabled = full;
+    $("#roulInput").placeholder = full ? "10개가 꽉 찼어요. 지우거나 고쳐 주세요" : "예: 떡볶이, 영화 보기";
+    $("#roulSubmit").disabled = full;
+    $("#roulSpin2").disabled = roulSpinning || list.length < 2;
+    if (!roulSpinning) {
+      $("#roulResult").innerHTML = roulLast && list.some((it) => it.id === roulLast.id)
+        ? `<span class="tag" style="background:${roulLast.color}">🎉 ${esc(roulLast.text)}</span>`
+        : `<small>${list.length < 2 ? "아래에서 내용을 2개 이상 넣으면 돌릴 수 있어요" : "가운데 GO나 아래 버튼을 눌러 돌려요"}</small>`;
+    }
+    $("#roulList").innerHTML = list.map((it) => `<div class="todo-item roul-item${roulLast && roulLast.id === it.id ? " hit" : ""}" data-id="${esc(it.id)}">
+        <span class="roul-dot" style="background:${roulColor(it)}"></span>
+        <span class="todo-text"><span>${esc(it.text)}</span></span>
+        <button class="todo-edit-btn" data-r="edit" aria-label="수정">✏️</button>
+        <button class="todo-del" data-r="del" aria-label="지우기">✕</button>
+      </div>`).join("");
+  };
+  todoRedraw = draw;
+  draw();
+
+  const spin = () => {
+    const list = [...roulItems].sort(byTime);
+    if (roulSpinning || list.length < 2) return;
+    roulSpinning = true;
+    const n = list.length, step = 360 / n;
+    const i = Math.floor(Math.random() * n);
+    const jitter = (Math.random() - 0.5) * step * 0.7;   // 칸 가운데에서 살짝 비껴서 멈춤
+    const target = (((360 - (i * step + step / 2 + jitter)) % 360) + 360) % 360;
+    roulRot = roulRot - (((roulRot % 360) + 360) % 360) + 360 * 6 + target;
+    $("#roulResult").innerHTML = `<small>두근두근…</small>`;
+    $("#roulSpin2").disabled = true;
+    setRot(roulRot, true);
+    setTimeout(() => {
+      roulSpinning = false;
+      roulLast = { id: list[i].id, text: list[i].text, color: roulColor(list[i]) };
+      if ($("#roulWheel")) draw();
+    }, 4300);
+  };
+  $("#roulSpin").addEventListener("click", spin);
+  $("#roulSpin2").addEventListener("click", spin);
+  $("#roulCancel").addEventListener("click", () => { resetForm(); draw(); });
+  $("#roulList").addEventListener("click", async (e) => {
+    const b = e.target.closest("[data-r]");
+    if (!b) return;
+    const it = roulItems.find((x) => x.id === b.closest(".roul-item").dataset.id);
+    if (!it) return;
+    if (b.dataset.r === "edit") {
+      editing = it.id;
+      $("#roulInput").value = it.text;
+      $("#roulFormTitle").textContent = "✏️ 룰렛 내용 고치기";
+      $("#roulSubmit").textContent = "저장";
+      $("#roulCancel").hidden = false;
+      draw();
+      $("#roulInput").focus();
+      return;
+    }
+    if (b.dataset.r === "del") {
+      try {
+        await rstore.remove(it.id);
+        showUndo(`'${it.text}'을(를) 지웠어요`, () => rstore.restore(it.id, todoData(it)));
+      } catch (err) { console.error(err); toast("지우지 못했어요"); }
+    }
+  });
+  $("#roulForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const text = $("#roulInput").value.trim();
+    if (!text) { $("#roulInput").focus(); return; }
+    const id = editing;
+    if (!id && roulItems.length >= ROUL_MAX) { toast("룰렛은 10개까지 넣을 수 있어요"); return; }
+    if (roulItems.some((x) => x.id !== id && x.text === text)) { toast("이미 있는 내용이에요"); return; }
+    resetForm();
+    try {
+      if (id) { await rstore.update(id, { text }); toast("고쳤어요"); }
+      else await rstore.set(ROUL_PREFIX + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), { text, color: roulNextColor(), by: me || "" });
+    } catch (err) { console.error(err); toast("저장하지 못했어요"); }
+  });
+}
+
+// ---------- 소원권 (미니 기능 → 🎟 소원권) ----------
+// "_wish_"로 시작하는 칸에 저장해요 {who: "병민"|"가영"(딴 사람), date: 딴 날 "YYYY-MM-DD", note(선택), used: 썼는지}
+// 유효기간은 딴 날부터 한 달 (예: 11월 6일에 따면 12월 6일까지). 위 점수 = 지금 쓸 수 있는(안 쓰고 안 지난) 소원권 개수
+const WISH_PREFIX = "_wish_";
+const WISH_WHO = ["병민", "가영"];
+let wishes = [];
+function wishEnd(date) {   // 한 달 뒤 같은 날 (그 달에 그날이 없으면 그 달 마지막 날)
+  const [y, m, d] = date.split("-").map(Number);
+  const last = new Date(y, m + 1, 0).getDate();
+  return ymd(new Date(y, m, Math.min(d, last)));
+}
+const wishLeft = (w) => dueLeft(wishEnd(w.date));
+const wishAlive = (w) => !w.used && wishLeft(w) >= 0;
+const mdText = (ds) => {
+  const [y, m, d] = ds.split("-").map(Number);
+  return `${y !== new Date().getFullYear() ? y + "년 " : ""}${m}월 ${d}일`;
+};
+function openWish() {
+  const today = ymd(new Date());
+  let addWho = WISH_WHO.includes(me) ? me : "병민";
+  openSheet(`
+    <h2><span>🧩 미니 기능</span><button class="close">✕</button></h2>
+    ${todoTabsHtml("wish")}
+    <div class="wish-score" id="wishScore"></div>
+    <form class="ev-form" id="wishForm" style="margin-top:0">
+      <div class="ev-form-title">＋ 소원권 땄어요</div>
+      <div class="chips who-chips" id="wishWho"><span class="who-label">🙋 누가</span>${WISH_WHO.map((w) =>
+        `<button type="button" class="chip who ${WHO_CLS[w]}" data-w="${w}">${w}</button>`).join("")}</div>
+      <input type="text" id="wishNote" placeholder="어떻게 땄나요? (안 적어도 돼요) 예: 볼링 내기" maxlength="40" enterkeyhint="done" autocomplete="off">
+      <div class="todo-due">
+        <label for="wishDate">📅 딴 날</label>
+        <input type="date" id="wishDate" value="${today}" max="${today}">
+        <button class="btn main">추가</button>
+      </div>
+      <div class="hint" style="margin:0">소원권은 딴 날부터 <b>한 달</b> 동안 쓸 수 있어요. 소원을 쓰면 <b>사용</b>을 눌러 주세요.</div>
+    </form>
+    <div id="wishList"></div>`);
+  bindTodoTabs();
+  const markAddWho = () => markWho($("#wishForm"), addWho);
+  markAddWho();
+  const row = (w) => {
+    const left = wishLeft(w), alive = wishAlive(w), end = wishEnd(w.date);
+    const badge = w.used ? `<span class="dbadge">사용함</span>`
+      : left < 0 ? `<span class="dbadge">만료</span>`
+      : `<span class="dbadge ${dClass(left)}">${dLabel(left)}</span>`;
+    const sub = `${mdText(w.date)} 획득 · ${w.used ? "썼어요" : alive ? `${mdText(end)}까지` : `${mdText(end)}에 끝났어요`}`;
+    return `<div class="todo-item wish-item${alive ? "" : " over"}${w.used ? " used" : ""}" data-id="${esc(w.id)}">
+      <span class="ci-emoji">🎟</span>
+      <span class="todo-text">${whoTag(w.who)}<span>${esc(w.note || "소원권")}</span><small>${sub}</small></span>
+      ${badge}
+      ${alive || w.used ? `<button class="btn sm wish-use" data-w="use">${w.used ? "취소" : "사용"}</button>` : ""}
+      <button class="todo-del" data-w="del" aria-label="지우기">✕</button>
+    </div>`;
+  };
+  const draw = () => {
+    if (!$("#wishList")) { todoRedraw = null; return; }
+    const cnt = (who) => wishes.filter((w) => w.who === who && wishAlive(w)).length;
+    $("#wishScore").innerHTML = `
+      <div class="side bm"><span>병민</span><b>${cnt("병민")}</b></div>
+      <div class="colon">:</div>
+      <div class="side gy"><span>가영</span><b>${cnt("가영")}</b></div>`;
+    const alive = wishes.filter(wishAlive).sort((a, b) => wishLeft(a) - wishLeft(b) || byTime(a, b));
+    const past = wishes.filter((w) => !wishAlive(w)).sort((a, b) => b.date.localeCompare(a.date) || byTime(b, a));
+    $("#wishList").innerHTML =
+      `<div class="wish-sec">보유 중인 소원권 ${alive.length}장</div>` +
+      (alive.length ? alive.map(row).join("") : `<div class="msg">지금 쓸 수 있는 소원권이 없어요</div>`) +
+      (past.length ? `<div class="wish-sec">사용했거나 끝난 소원권</div>` + past.map(row).join("") : "");
+  };
+  todoRedraw = draw;
+  draw();
+
+  $("#wishWho").addEventListener("click", (e) => {
+    const c = e.target.closest("[data-w]");
+    if (c) { addWho = c.dataset.w; markAddWho(); }
+  });
+  $("#wishForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const date = $("#wishDate").value || today;
+    const note = $("#wishNote").value.trim();
+    $("#wishNote").value = ""; $("#wishDate").value = today;
+    try {
+      await rstore.set(WISH_PREFIX + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), { who: addWho, date, note, used: false, by: me || "" });
+      toast(wishEnd(date) < today ? "한 달이 지나서 이미 끝난 소원권으로 넣었어요" : `${addWho} 소원권 +1 🎟`);
+    } catch (err) { console.error(err); toast("저장하지 못했어요"); }
+  });
+  $("#wishList").addEventListener("click", async (e) => {
+    const b = e.target.closest("[data-w]");
+    if (!b) return;
+    const w = wishes.find((x) => x.id === b.closest(".wish-item").dataset.id);
+    if (!w) return;
+    try {
+      if (b.dataset.w === "use") {
+        await rstore.update(w.id, { used: !w.used });
+        if (!w.used) showUndo(`${w.who} 소원권을 썼어요`, () => rstore.update(w.id, { used: false }));
+      } else if (b.dataset.w === "del") {
+        await rstore.remove(w.id);
+        showUndo(`${w.who} 소원권을 지웠어요`, () => rstore.restore(w.id, todoData(w)));
+      }
+    } catch (err) { console.error(err); toast("저장하지 못했어요"); }
+  });
+}
+
 // ---------- 시작 ----------
 async function start() {
   if (useFirebase && room) {
@@ -2731,6 +3014,8 @@ async function start() {
     couple = list.find((r) => r.id === COUPLE_ID) || null;
     todos = list.filter((r) => r.id.startsWith(TODO_PREFIX));
     events = list.filter((r) => r.id.startsWith(EVENT_PREFIX) && r.date);
+    roulItems = list.filter((r) => r.id.startsWith(ROUL_PREFIX) && r.text);
+    wishes = list.filter((r) => r.id.startsWith(WISH_PREFIX) && r.date && WISH_WHO.includes(r.who));
     drawTodos();
     ratings = Object.fromEntries(list.filter((r) => !r.id.startsWith("_")).map((r) => [r.id, r]));
     drawDday();

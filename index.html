@@ -181,7 +181,13 @@ body.at-home .menu-text small { white-space: nowrap; overflow: hidden; text-over
 .todo-edit-btn { flex: none; font-size: 15px; padding: 4px 2px; }
 /* 기한 칸: 올해 안에 · 이번 달 안에 · ASAP */
 .chips.due-chips { margin: 0; padding: 0; }
-.due-chips .chip { padding: 6px 12px; }
+.chips.due-chips { flex-wrap: nowrap; gap: 6px; }
+.due-chips .chip { padding: 6px 10px; flex: none; }
+.todo-range[hidden] { display: none; }
+.todo-range > span { flex: none; color: var(--sub); }
+.todo-add-row { display: flex; gap: 8px; }
+.todo-add-row input { flex: 1; min-width: 0; }
+.todo-add-row .btn { flex: none; min-height: 44px; padding: 0 18px; font-size: 15px; }
 /* 할 일 수정: 그 줄이 입력 칸으로 바뀌어요 */
 .todo-edit { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
 .todo-edit .todo-due .btn { padding: 0 12px; font-size: 14px; }
@@ -228,8 +234,20 @@ body.at-home .menu-text small { white-space: nowrap; overflow: hidden; text-over
 .cal-ev { display: block; font-size: 10px; line-height: 1.4; padding: 0 3px; border-radius: 4px; white-space: nowrap; overflow: hidden; text-overflow: clip; }
 .cal-ev.holi { color: #e05a5a; font-weight: 700; padding: 0 1px; }
 .cal-legend .holi { color: #e05a5a; }
-.cal-ev.plan { background: var(--plan-soft); color: var(--plan); }
-.cal-ev.anniv { background: var(--accent-soft); color: var(--accent); }
+.cal-ev.plan, .cal-ev.anniv { background: var(--accent-soft); color: var(--accent); }
+.cal-ev.anniv { font-weight: 700; }
+.cal-ev.todo.start, .cal-ev.todo.mid, .cal-ev.todo.end { border-radius: 0; }
+.cal-ev.plan.start { border-radius: 4px 0 0 4px; margin-right: -4px; }
+.cal-ev.plan.mid { border-radius: 0; margin: 0 -4px; }
+.cal-ev.plan.end { border-radius: 0 4px 4px 0; margin-left: -4px; }
+.ev-end-row[hidden] { display: none; }
+.cal-ev.plan.bm, .cal-ev.anniv.bm { background: var(--bm-soft); color: var(--bm); }
+.cal-ev.plan.gy, .cal-ev.anniv.gy { background: var(--gy-soft); color: var(--gy); }
+.cal-legend .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 3px; vertical-align: 0; }
+.cal-legend .dot.both { background: var(--accent); }
+.cal-legend .dot.bm { background: var(--bm); }
+.cal-legend .dot.gy { background: var(--gy); }
+.cal-legend.who-legend { margin-top: 4px; }
 .cal-ev.auto { background: var(--accent); color: #fff; }
 .cal-ev.todo { background: var(--bg); color: var(--text); border-left: 3px solid var(--accent); }
 .cal-ev.todo.bm { border-left-color: var(--bm); }
@@ -2298,7 +2316,14 @@ document.addEventListener("click", (e) => {
 // 안 한 일이 위(ASAP → 기한 가까운 순 → 기한 없는 일은 먼저 적은 순), 다 한 일은 아래로 내려가고 줄이 그어져요
 // 기한: dueKind = "date"(날짜 고름) | "month"(이번 달 안에) | "year"(올해 안에) | "asap" | ""(없음)
 //       due = 마감 날 "YYYY-MM-DD" (이번 달 안에 = 그달 마지막 날, 올해 안에 = 12월 31일, ASAP·없음 = 빈칸)
-const DUE_CHIPS = [["year", "올해 안에"], ["month", "이번 달 안에"], ["asap", "ASAP"]];
+//       start = 날짜 지정에서 시작일~종료일로 고르면 시작일 (이때 due = 종료일). 하루만이면 빈칸
+const DUE_CHIPS = [["year", "올해 안에"], ["month", "이번 달 안에"], ["asap", "ASAP"], ["date", "📅 날짜"]];
+const todoStart = (t) => (todoKind(t) === "date" && t.start && t.due && t.start < t.due ? t.start : t.due || "");
+function rangeData(d1, d2) {   // 날짜 지정 칸 두 개 → { due, start }
+  if (!d1 && d2) d1 = d2;
+  if (d2 && d2 > d1) return { due: d2, start: d1 };
+  return { due: d1 || "", start: "" };
+}
 const todoKind = (t) => t.dueKind || (t.due ? "date" : "");   // 예전 할 일은 dueKind가 없어요
 const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 function periodEnd(kind) {   // 고른 순간 기준으로 그 기간의 마지막 날
@@ -2332,6 +2357,12 @@ function dueText(t) {   // 글 아래 작은 글씨
   const yy = y !== new Date().getFullYear() ? y + "년 " : "";
   if (k === "year") return `${y}년 안에`;
   if (k === "month") return `${yy}${m}월 안에`;
+  const st = todoStart(t);
+  if (st !== t.due) {   // 시작일 ~ 종료일
+    const [sy, sm, sd] = st.split("-").map(Number);
+    const syy = sy !== new Date().getFullYear() || sy !== y ? sy + "년 " : "";
+    return `${syy}${sm}월 ${sd}일 ~ ${sy !== y ? y + "년 " : ""}${sm !== m || sy !== y ? m + "월 " : ""}${d}일`;
+  }
   return `${yy}${m}월 ${d}일까지`;
 }
 const chipsHtml = (on, attr) => `<div class="chips due-chips">${DUE_CHIPS.map(([k, label]) =>
@@ -2382,14 +2413,17 @@ function openTodo(tab = todoTab) {
     <h2><span>🧩 미니 기능</span><small class="hint" id="todoCount" style="margin:0"></small><button class="close">✕</button></h2>
     ${todoTabsHtml("list")}
     <form class="todo-add" id="todoForm">
-      <input type="text" id="todoInput" placeholder="예: 영화 예매하기" maxlength="100" enterkeyhint="done" autocomplete="off">
-      <div class="todo-due">
-        <label for="todoDue">📅 기한</label>
-        <input type="date" id="todoDue">
+      <div class="todo-add-row">
+        <input type="text" id="todoInput" placeholder="예: 영화 예매하기" maxlength="100" enterkeyhint="done" autocomplete="off">
         <button class="btn main">추가</button>
       </div>
       ${chipsHtml("", "data-add")}
-      <div class="hint" style="margin:0">기한은 날짜나 위 칸 중 하나로. 안 정해도 돼요.</div>
+      <div class="todo-due todo-range" id="todoRange" hidden>
+        <input type="date" id="todoDue" aria-label="날짜 (시작일)">
+        <span>~</span>
+        <input type="date" id="todoEnd" aria-label="종료일 (안 골라도 돼요)">
+      </div>
+      <div class="hint" style="margin:0">기한은 위 칸 중 하나로 (안 정해도 돼요). 📅 날짜는 하루면 앞 칸만, 며칠이면 끝나는 날까지 골라요.</div>
       ${whoChipsHtml("같이", "data-addwho")}
     </form>
     <div id="todoList"></div>
@@ -2401,12 +2435,12 @@ function openTodo(tab = todoTab) {
   let editing = null, draft = null;
   const editHtml = (t) => `<div class="todo-item editing" data-id="${esc(t.id)}"><div class="todo-edit">
       <input type="text" class="te-text" value="${esc(draft.text)}" maxlength="100" enterkeyhint="done" autocomplete="off" aria-label="할 일">
-      <div class="todo-due">
-        <label>📅 기한</label>
-        <input type="date" class="te-due" value="${draft.kind === "date" ? esc(draft.due) : ""}" aria-label="기한">
-        <button class="btn" data-t="nodue">기한 빼기</button>
-      </div>
       ${chipsHtml(draft.kind, `data-t="kind"`)}
+      <div class="todo-due todo-range"${draft.kind === "date" ? "" : " hidden"}>
+        <input type="date" class="te-due" value="${esc(draft.d1)}" aria-label="날짜 (시작일)">
+        <span>~</span>
+        <input type="date" class="te-end" value="${esc(draft.d2)}" aria-label="종료일 (안 골라도 돼요)">
+      </div>
       ${whoChipsHtml(draft.who, `data-t="who"`)}
       <div class="todo-edit-btns"><button class="btn" data-t="cancel">취소</button><button class="btn main" data-t="save">저장</button></div>
     </div></div>`;
@@ -2437,32 +2471,41 @@ function openTodo(tab = todoTab) {
   todoRedraw = draw;
   draw();
 
-  // 기한 칸: 다시 누르면 꺼지고, 날짜를 고르면 칸이 꺼지고, 칸을 누르면 날짜가 비워져요
-  const markChips = (box, k) => box.querySelectorAll(".due-chips .chip").forEach((c) => c.classList.toggle("on", c.dataset.k === k));
+  // 기한 칸: 다시 누르면 꺼져요. 📅 날짜 지정을 누르면 날짜 칸(시작일 ~ 종료일)이 나와요
+  const markChips = (box, k) => {
+    box.querySelectorAll(".due-chips .chip").forEach((c) => c.classList.toggle("on", c.dataset.k === k));
+    const r = box.querySelector(".todo-range");
+    if (r) r.hidden = k !== "date";
+  };
   $("#todoForm").addEventListener("click", (e) => {
     const w = e.target.closest(".chip[data-addwho]");
     if (w) { addWho = w.dataset.w; markWho($("#todoForm"), addWho); return; }
     const c = e.target.closest(".chip[data-add]");
     if (!c) return;
     addKind = addKind === c.dataset.k ? "" : c.dataset.k;
-    if (addKind) $("#todoDue").value = "";
+    if (addKind === "date" && !$("#todoDue").value) $("#todoDue").value = ymd(new Date());
     markChips($("#todoForm"), addKind);
   });
-  $("#todoDue").addEventListener("input", () => { if ($("#todoDue").value) { addKind = ""; markChips($("#todoForm"), ""); } });
+  $("#todoDue").addEventListener("change", () => {   // 시작일을 종료일 뒤로 옮기면 종료일 비우기
+    if ($("#todoEnd").value && $("#todoEnd").value <= $("#todoDue").value) $("#todoEnd").value = "";
+  });
   $("#todoForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     const input = $("#todoInput"), dueEl = $("#todoDue");
     const text = input.value.trim();
     if (!text) { input.focus(); toast("할 일을 적어 주세요"); return; }
-    const dueKind = addKind || (dueEl.value ? "date" : "");
-    const due = addKind ? periodEnd(addKind) : dueEl.value || "";
+    const endEl = $("#todoEnd");
+    if (addKind === "date" && !dueEl.value && !endEl.value) { toast("날짜를 골라 주세요"); return; }
+    if (addKind === "date" && dueEl.value && endEl.value && endEl.value < dueEl.value) { toast("끝나는 날이 시작하는 날보다 빨라요"); return; }
+    const dueKind = addKind;
+    const { due, start } = addKind === "date" ? rangeData(dueEl.value, endEl.value) : { due: periodEnd(addKind), start: "" };
     const who = addWho;
-    const was = { date: dueEl.value, kind: addKind };
-    input.value = ""; dueEl.value = ""; addKind = ""; markChips($("#todoForm"), ""); addWho = "같이"; markWho($("#todoForm"), addWho);
-    try { await rstore.set(TODO_PREFIX + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), { text, due, dueKind, who, done: false, by: me || "" }); }
+    const was = { d1: dueEl.value, d2: endEl.value, kind: addKind };
+    input.value = ""; dueEl.value = ""; endEl.value = ""; addKind = ""; markChips($("#todoForm"), ""); addWho = "같이"; markWho($("#todoForm"), addWho);
+    try { await rstore.set(TODO_PREFIX + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), { text, due, start, dueKind, who, done: false, by: me || "" }); }
     catch (err) {
       console.error(err); toast("저장하지 못했어요");
-      input.value = text; dueEl.value = was.date; addKind = was.kind; markChips($("#todoForm"), addKind); addWho = who; markWho($("#todoForm"), who);
+      input.value = text; dueEl.value = was.d1; endEl.value = was.d2; addKind = was.kind; markChips($("#todoForm"), addKind); addWho = who; markWho($("#todoForm"), who);
     }
   });
   const saveEdit = async () => {
@@ -2470,20 +2513,26 @@ function openTodo(tab = todoTab) {
     if (!t) return;
     const text = draft.text.trim();
     if (!text) { $(".te-text").focus(); toast("할 일을 적어 주세요"); return; }
-    const { due, kind: dueKind, who } = draft;
+    const { kind: dueKind, who } = draft;
+    if (dueKind === "date" && !draft.d1 && !draft.d2) { toast("날짜를 골라 주세요"); return; }
+    if (dueKind === "date" && draft.d1 && draft.d2 && draft.d2 < draft.d1) { toast("끝나는 날이 시작하는 날보다 빨라요"); return; }
+    const { due, start } = dueKind === "date" ? rangeData(draft.d1, draft.d2)
+      : { due: dueKind === todoKind(t) ? t.due || "" : periodEnd(dueKind), start: "" };   // 기간 칸을 그대로 두면 마감 날도 그대로
+    const oldStart = todoStart(t) !== (t.due || "") ? todoStart(t) : "";
     editing = draft = null;
     draw();
-    if (text === t.text && due === (t.due || "") && dueKind === todoKind(t) && who === whoOf(t)) return;
-    try { await rstore.update(t.id, { text, due, dueKind, who }); toast("고쳤어요"); }
+    if (text === t.text && due === (t.due || "") && start === oldStart && dueKind === todoKind(t) && who === whoOf(t)) return;
+    try { await rstore.update(t.id, { text, due, start, dueKind, who }); toast("고쳤어요"); }
     catch (err) { console.error(err); toast("저장하지 못했어요"); }
   };
   $("#todoList").addEventListener("input", (e) => {
     if (!draft) return;
     if (e.target.classList.contains("te-text")) draft.text = e.target.value;
     if (e.target.classList.contains("te-due")) {
-      draft.due = e.target.value; draft.kind = e.target.value ? "date" : "";
-      markChips($(".todo-item.editing"), "");
+      draft.d1 = e.target.value;
+      if (draft.d2 && draft.d2 <= draft.d1) { draft.d2 = ""; $(".te-end").value = ""; }
     }
+    if (e.target.classList.contains("te-end")) draft.d2 = e.target.value;
   });
   $("#todoList").addEventListener("keydown", (e) => {
     if (e.key === "Enter" && e.target.classList.contains("te-text") && !e.isComposing) { e.preventDefault(); saveEdit(); }
@@ -2495,18 +2544,19 @@ function openTodo(tab = todoTab) {
     if (!t) return;
     const act = b.dataset.t;
     if (act === "edit") {
-      editing = t.id; draft = { text: t.text, due: t.due || "", kind: todoKind(t), who: whoOf(t) };
+      const st = todoStart(t);
+      editing = t.id; draft = { text: t.text, kind: todoKind(t), who: whoOf(t),
+        d1: todoKind(t) === "date" ? st : "", d2: todoKind(t) === "date" && st !== t.due ? t.due : "" };
       draw();
       const input = $(".te-text");
       input.focus(); input.setSelectionRange(input.value.length, input.value.length);
       return;
     }
     if (act === "cancel") { editing = draft = null; draw(); return; }
-    if (act === "nodue") { draft.due = ""; draft.kind = ""; $(".te-due").value = ""; markChips($(".todo-item.editing"), ""); return; }
     if (act === "kind") {
       const k = draft.kind === b.dataset.k ? "" : b.dataset.k;
-      draft.kind = k; draft.due = periodEnd(k);
-      $(".te-due").value = "";
+      draft.kind = k;
+      if (k === "date" && !draft.d1) { draft.d1 = ymd(new Date()); $(".te-due").value = draft.d1; }
       markChips($(".todo-item.editing"), k);
       return;
     }
@@ -2532,12 +2582,20 @@ function openTodo(tab = todoTab) {
 
 // ---------- 캘린더 (할 일 창 → 📅 캘린더) ----------
 // 날짜를 고른 할 일 + 기념일·일정 + 사귄 날로 센 우리 기념일(100일 단위·주년)이 달력에 보여요.
-// 기념일·일정은 "_event_"로 시작하는 칸에 저장해요 {title, date, type: "plan"(일정) | "anniv"(기념일, 매년), place(장소, 선택)}
+// 기념일·일정은 "_event_"로 시작하는 칸에 저장해요 {title, date, type: "plan"(일정) | "anniv"(기념일, 매년), who: 같이|병민|가영 (없으면 같이), end(여러 날 일정의 끝나는 날, 선택), place(장소, 선택)}
 // — 할 일 목록은 "_todo_"만 보니까 기념일·일정은 목록에 안 나와요
 const EVENT_PREFIX = "_event_";
 let events = [];
 const EV_TYPES = [["plan", "📌", "일정"], ["anniv", "🎂", "기념일 (매년)"]];
 const evEmoji = (type) => (type === "anniv" ? "🎂" : "📌");
+const evEnd = (e) => (e.type !== "anniv" && e.end && e.end > e.date ? e.end : e.date);   // 여러 날 일정의 끝나는 날
+const evMd = (ds) => { const [, m, d] = ds.split("-").map(Number); return `${m}/${d}`; };
+function evRangeText(e) {   // "11/18 ~ 11/21 (4일)"
+  const end = evEnd(e);
+  if (end === e.date) return "";
+  const n = Math.round((Date.parse(end) - Date.parse(e.date)) / 864e5) + 1;
+  return `${evMd(e.date)} ~ ${evMd(end)} (${n}일)`;
+}
 const WEEK = ["일", "월", "화", "수", "목", "금", "토"];
 // 한국 공휴일 (대체공휴일·선거일 포함, 2025~2030년). 2031년부터는 이 표에 더 넣어야 해요.
 // 설·추석·부처님오신날은 음력이라 해마다 날짜가 달라서 표로 적어 둬요. 노동절·제헌절은 2026년부터 공휴일
@@ -2583,10 +2641,10 @@ function itemsOn(ds) {   // 그날 보일 것: 공휴일 → 우리 기념일 �
   if (HOLIDAYS[ds]) out.push({ kind: "holi", title: HOLIDAYS[ds] });
   const auto = coupleAnniv(y, m, d);
   if (auto) out.push({ kind: "auto", title: auto });
-  events.filter((e) => (e.type === "anniv" ? e.date.slice(5) === ds.slice(5) && e.date <= ds : e.date === ds))
+  events.filter((e) => (e.type === "anniv" ? e.date.slice(5) === ds.slice(5) && e.date <= ds : e.date <= ds && ds <= evEnd(e)))
     .sort((a, b) => (a.type === "anniv" ? 0 : 1) - (b.type === "anniv" ? 0 : 1) || byTime(a, b))
     .forEach((e) => out.push({ kind: e.type === "anniv" ? "anniv" : "plan", title: e.title, e }));
-  todos.filter((t) => todoKind(t) === "date" && t.due === ds)
+  todos.filter((t) => todoKind(t) === "date" && t.due && todoStart(t) <= ds && ds <= t.due)
     .sort((a, b) => a.done - b.done || byTime(a, b))
     .forEach((t) => out.push({ kind: "todo", title: t.text, t }));
   return out;
@@ -2611,6 +2669,7 @@ function openCalendar() {
     <div class="cal-week">${WEEK.map((w, i) => `<span class="${i === 0 ? "sun" : i === 6 ? "sat" : ""}">${w}</span>`).join("")}</div>
     <div class="cal-grid" id="calGrid"></div>
     <div class="cal-legend"><span class="holi">🇰🇷 공휴일</span><span>💕 우리 기념일</span><span>🎂 기념일</span><span>📌 일정</span><span>✅ 할 일</span></div>
+    <div class="cal-legend who-legend">${WHO.map((w) => `<span><i class="dot ${WHO_CLS[w]}"></i>${w}</span>`).join("")}<span>· 굵은 글씨 = 기념일</span></div>
     <div class="cal-day" id="calDay"></div>
     <form class="ev-form" id="evForm">
       <div class="ev-form-title" id="evFormTitle">＋ 기념일 · 일정 추가</div>
@@ -2618,20 +2677,29 @@ function openCalendar() {
       <input type="text" id="evPlace" placeholder="📍 장소 (안 적어도 돼요)" maxlength="60" enterkeyhint="done" autocomplete="off">
       <div class="chips" id="evTypes">${EV_TYPES.map(([k, emoji, label]) =>
         `<button type="button" class="chip${k === "plan" ? " on" : ""}" data-type="${k}">${emoji} ${label}</button>`).join("")}</div>
+      <div id="evWho">${whoChipsHtml("같이", "data-evwho")}</div>
       <div class="todo-due">
         <label for="evDate">📅 날짜</label>
         <input type="date" id="evDate" value="${calSel}">
         <button class="btn main" id="evSubmit">추가</button>
       </div>
+      <div class="todo-due ev-end-row" id="evEndRow">
+        <label for="evEnd">~ 끝나는 날</label>
+        <input type="date" id="evEnd" value="">
+        <button type="button" class="btn sm" id="evEndClear">하루만</button>
+      </div>
       <button type="button" class="btn" id="evCancel" hidden>취소</button>
-      <div class="hint" style="margin:0">기념일은 매년 같은 날에 보여요. 기념일·일정은 할 일 목록에는 안 나와요.<br>할 일은 날짜를 고른 것만 캘린더에 보여요.</div>
+      <div class="hint" style="margin:0">여행처럼 며칠 걸리는 일정은 '끝나는 날'을 고르세요 (비우면 하루만).<br>기념일은 매년 같은 날에 보여요. 기념일·일정은 할 일 목록에는 안 나와요.<br>할 일은 📅 날짜를 고른 것만 캘린더에 보여요.</div>
     </form>`);
   bindTodoTabs();
-  let evType = "plan", evEditing = null;   // 고치는 중인 기념일·일정 id (없으면 새로 추가)
-  const markType = () => $("#evTypes").querySelectorAll(".chip").forEach((c) => c.classList.toggle("on", c.dataset.type === evType));
+  let evType = "plan", evWho = "같이", evEditing = null;   // 고치는 중인 기념일·일정 id (없으면 새로 추가)
+  const markType = () => {
+    $("#evTypes").querySelectorAll(".chip").forEach((c) => c.classList.toggle("on", c.dataset.type === evType));
+    $("#evEndRow").hidden = evType === "anniv";   // 기념일은 하루만
+  };
   const resetForm = () => {
-    evEditing = null; evType = "plan"; markType();
-    $("#evTitle").value = ""; $("#evPlace").value = ""; $("#evDate").value = calSel;
+    evEditing = null; evType = "plan"; markType(); evWho = "같이"; markWho($("#evWho"), evWho);
+    $("#evTitle").value = ""; $("#evPlace").value = ""; $("#evDate").value = calSel; $("#evEnd").value = "";
     $("#evFormTitle").textContent = "＋ 기념일 · 일정 추가";
     $("#evSubmit").textContent = "추가";
     $("#evCancel").hidden = true;
@@ -2652,7 +2720,7 @@ function openCalendar() {
       const shown = items.length > 3 ? items.slice(0, 2) : items;
       cells.push(`<button type="button" class="cal-cell${wd === 0 || HOLIDAYS[ds] ? " sun" : wd === 6 ? " sat" : ""}${ds === today ? " today" : ""}${ds === calSel ? " sel" : ""}" data-d="${ds}">
         <span class="cal-num">${d}</span>
-        ${shown.map((it) => `<span class="cal-ev ${it.kind}${it.t ? ` ${WHO_CLS[whoOf(it.t)]}${it.t.done ? " done" : ""}` : ""}">${esc(it.title)}</span>`).join("")}
+        ${shown.map((it) => `<span class="cal-ev ${it.kind}${it.t ? ` ${WHO_CLS[whoOf(it.t)]}${it.t.done ? " done" : ""}${todoStart(it.t) !== it.t.due ? (ds === todoStart(it.t) ? " start" : ds === it.t.due ? " end" : " mid") : ""}` : it.e ? ` ${WHO_CLS[whoOf(it.e)]}${evEnd(it.e) !== it.e.date ? (ds === it.e.date ? " start" : ds === evEnd(it.e) ? " end" : " mid") : ""}` : ""}">${(it.e && evEnd(it.e) !== it.e.date && ds !== it.e.date) || (it.t && todoStart(it.t) !== it.t.due && ds !== todoStart(it.t)) ? "↳" : ""}${esc(it.title)}</span>`).join("")}
         ${items.length > shown.length ? `<span class="cal-more">+${items.length - shown.length}</span>` : ""}
       </button>`);
     }
@@ -2668,15 +2736,15 @@ function openCalendar() {
         const t = it.t;
         return `<div class="todo-item${t.done ? " done" : ""}" data-tid="${esc(t.id)}">
           <button class="todo-check" data-c="ttoggle" aria-label="${t.done ? "안 한 걸로" : "다 했어요"}"></button>
-          <button class="todo-text" data-c="ttoggle">${whoTag(whoOf(t))}<span>${esc(t.text)}</span><small>할 일</small></button>
+          <button class="todo-text" data-c="ttoggle">${whoTag(whoOf(t))}<span>${esc(t.text)}</span><small>할 일${todoStart(t) !== t.due ? ` · ${esc(dueText(t))}` : ""}</small></button>
         </div>`;
       }
       const e = it.e;
       const ey = e.date.slice(0, 4);
-      const sub = (e.type === "anniv" ? `기념일 · 매년${calSel.slice(0, 4) > ey ? ` (${ey}년부터)` : ""}` : "일정") + (e.place ? ` · 📍 ${esc(e.place)}` : "");
+      const sub = (e.type === "anniv" ? `기념일 · 매년${calSel.slice(0, 4) > ey ? ` (${ey}년부터)` : ""}` : "일정" + (evRangeText(e) ? ` · ${evRangeText(e)}` : "")) + (e.place ? ` · 📍 ${esc(e.place)}` : "");
       return `<div class="todo-item" data-eid="${esc(e.id)}">
         <span class="ci-emoji">${evEmoji(e.type)}</span>
-        <span class="todo-text"><span>${esc(e.title)}</span><small>${sub}</small></span>
+        <span class="todo-text">${whoTag(whoOf(e))}<span>${esc(e.title)}</span><small>${sub}</small></span>
         ${e.place ? `<button class="btn sm naver" data-c="evmap" aria-label="네이버지도에서 보기">N 지도</button>` : ""}
         <button class="todo-edit-btn" data-c="evedit" aria-label="수정">✏️</button>
         <button class="todo-del" data-c="evdel" aria-label="지우기">✕</button>
@@ -2716,8 +2784,8 @@ function openCalendar() {
     if (!ev) return;
     if (act === "evmap") { openNaver(ev.place); return; }
     if (act === "evedit") {
-      evEditing = ev.id; evType = ev.type === "anniv" ? "anniv" : "plan"; markType();
-      $("#evTitle").value = ev.title; $("#evPlace").value = ev.place || ""; $("#evDate").value = ev.date;
+      evEditing = ev.id; evType = ev.type === "anniv" ? "anniv" : "plan"; markType(); evWho = whoOf(ev); markWho($("#evWho"), evWho);
+      $("#evTitle").value = ev.title; $("#evPlace").value = ev.place || ""; $("#evDate").value = ev.date; $("#evEnd").value = evEnd(ev) !== ev.date ? evEnd(ev) : "";
       $("#evFormTitle").textContent = "✏️ 기념일 · 일정 고치기";
       $("#evSubmit").textContent = "저장";
       $("#evCancel").hidden = false;
@@ -2736,7 +2804,15 @@ function openCalendar() {
     const c = e.target.closest(".chip[data-type]");
     if (c) { evType = c.dataset.type; markType(); }
   });
+  $("#evWho").addEventListener("click", (e) => {
+    const c = e.target.closest(".chip[data-evwho]");
+    if (c) { evWho = c.dataset.w; markWho($("#evWho"), evWho); }
+  });
   $("#evCancel").addEventListener("click", () => { resetForm(); });
+  $("#evEndClear").addEventListener("click", () => { $("#evEnd").value = ""; });
+  $("#evDate").addEventListener("change", () => {   // 시작 날을 끝나는 날 뒤로 옮기면 끝나는 날 비우기
+    if ($("#evEnd").value && $("#evEnd").value <= $("#evDate").value) $("#evEnd").value = "";
+  });
   $("#evTitle").addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); $("#evPlace").focus(); }
   });
@@ -2745,7 +2821,10 @@ function openCalendar() {
     const title = $("#evTitle").value.trim(), date = $("#evDate").value;
     if (!title) { $("#evTitle").focus(); toast("이름을 적어 주세요"); return; }
     if (!date) { toast("날짜를 골라 주세요"); return; }
-    const data = { title, date, type: evType, place: $("#evPlace").value.trim() };
+    let end = evType === "anniv" ? "" : $("#evEnd").value;
+    if (end && end < date) { toast("끝나는 날이 시작하는 날보다 빨라요"); return; }
+    if (end === date) end = "";
+    const data = { title, date, end, type: evType, who: evWho, place: $("#evPlace").value.trim() };
     const id = evEditing;
     calSel = date; calMonth = date.slice(0, 7);
     resetForm();

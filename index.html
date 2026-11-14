@@ -35,6 +35,7 @@
   --plan-soft: #ddf3ef;
   --anniv: #c86a12;
   --anniv-soft: #fdebd6;
+  --anniv-solid: #dd7414;
 }
 /* 화면 모드: 설정에서 '자동'이면 아이폰 설정을 따르고, '라이트'·'다크'를 고르면 그 모드로 (html의 data-theme) */
 @media (prefers-color-scheme: dark) {
@@ -58,6 +59,7 @@
     --plan-soft: #1f3a36;
     --anniv: #f2b366;
     --anniv-soft: #46321b;
+  --anniv-solid: #d27f24;
   }
 }
 :root[data-theme="dark"] {
@@ -80,6 +82,7 @@
   --plan-soft: #1f3a36;
   --anniv: #f2b366;
   --anniv-soft: #46321b;
+  --anniv-solid: #d27f24;
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; }
@@ -241,8 +244,8 @@ body.at-home .menu-text small { white-space: nowrap; overflow: hidden; text-over
 .cal-ev.holi { color: #e05a5a; font-weight: 700; padding: 0 1px; }
 .cal-legend .holi { color: #e05a5a; }
 .cal-ev.plan { background: var(--accent-soft); color: var(--accent); }
-/* 기념일은 누구든 주황(같이 일정 분홍과 구분), 왼쪽 줄 색 = 누구 */
-.cal-ev.anniv { background: var(--anniv-soft); color: var(--anniv); font-weight: 700; border-left: 3px solid var(--accent); }
+/* 기념일은 누구든 진한 주황 바탕 + 흰 글씨(우리 기념일처럼), 왼쪽 줄 색 = 누구 */
+.cal-ev.anniv { background: var(--anniv-solid); color: #fff; font-weight: 700; border-left: 3px solid var(--accent); }
 .cal-ev.anniv.bm { border-left-color: var(--bm); }
 .cal-ev.anniv.gy { border-left-color: var(--gy); }
 .cal-ev.todo.start, .cal-ev.todo.mid, .cal-ev.todo.end { border-radius: 0; }
@@ -252,7 +255,7 @@ body.at-home .menu-text small { white-space: nowrap; overflow: hidden; text-over
 .ev-end-row[hidden] { display: none; }
 .cal-ev.plan.bm { background: var(--bm-soft); color: var(--bm); }
 .cal-ev.plan.gy { background: var(--gy-soft); color: var(--gy); }
-.cal-legend .dot.anniv { background: var(--anniv); }
+.cal-legend .dot.anniv { background: var(--anniv-solid); }
 .cal-legend .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 3px; vertical-align: 0; }
 .cal-legend .dot.both { background: var(--accent); }
 .cal-legend .dot.bm { background: var(--bm); }

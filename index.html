@@ -33,6 +33,8 @@
   --gy-soft: #f0e6fa;
   --plan: #2a9283;
   --plan-soft: #ddf3ef;
+  --anniv: #c86a12;
+  --anniv-soft: #fdebd6;
 }
 /* 화면 모드: 설정에서 '자동'이면 아이폰 설정을 따르고, '라이트'·'다크'를 고르면 그 모드로 (html의 data-theme) */
 @media (prefers-color-scheme: dark) {
@@ -54,6 +56,8 @@
     --gy-soft: #382b47;
     --plan: #74cdbf;
     --plan-soft: #1f3a36;
+    --anniv: #f2b366;
+    --anniv-soft: #46321b;
   }
 }
 :root[data-theme="dark"] {
@@ -74,6 +78,8 @@
   --gy-soft: #382b47;
   --plan: #74cdbf;
   --plan-soft: #1f3a36;
+  --anniv: #f2b366;
+  --anniv-soft: #46321b;
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; }
@@ -234,15 +240,19 @@ body.at-home .menu-text small { white-space: nowrap; overflow: hidden; text-over
 .cal-ev { display: block; font-size: 10px; line-height: 1.4; padding: 0 3px; border-radius: 4px; white-space: nowrap; overflow: hidden; text-overflow: clip; }
 .cal-ev.holi { color: #e05a5a; font-weight: 700; padding: 0 1px; }
 .cal-legend .holi { color: #e05a5a; }
-.cal-ev.plan, .cal-ev.anniv { background: var(--accent-soft); color: var(--accent); }
-.cal-ev.anniv { font-weight: 700; }
+.cal-ev.plan { background: var(--accent-soft); color: var(--accent); }
+/* 기념일은 누구든 주황(같이 일정 분홍과 구분), 왼쪽 줄 색 = 누구 */
+.cal-ev.anniv { background: var(--anniv-soft); color: var(--anniv); font-weight: 700; border-left: 3px solid var(--accent); }
+.cal-ev.anniv.bm { border-left-color: var(--bm); }
+.cal-ev.anniv.gy { border-left-color: var(--gy); }
 .cal-ev.todo.start, .cal-ev.todo.mid, .cal-ev.todo.end { border-radius: 0; }
 .cal-ev.plan.start { border-radius: 4px 0 0 4px; margin-right: -4px; }
 .cal-ev.plan.mid { border-radius: 0; margin: 0 -4px; }
 .cal-ev.plan.end { border-radius: 0 4px 4px 0; margin-left: -4px; }
 .ev-end-row[hidden] { display: none; }
-.cal-ev.plan.bm, .cal-ev.anniv.bm { background: var(--bm-soft); color: var(--bm); }
-.cal-ev.plan.gy, .cal-ev.anniv.gy { background: var(--gy-soft); color: var(--gy); }
+.cal-ev.plan.bm { background: var(--bm-soft); color: var(--bm); }
+.cal-ev.plan.gy { background: var(--gy-soft); color: var(--gy); }
+.cal-legend .dot.anniv { background: var(--anniv); }
 .cal-legend .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 3px; vertical-align: 0; }
 .cal-legend .dot.both { background: var(--accent); }
 .cal-legend .dot.bm { background: var(--bm); }
@@ -2669,7 +2679,7 @@ function openCalendar() {
     <div class="cal-week">${WEEK.map((w, i) => `<span class="${i === 0 ? "sun" : i === 6 ? "sat" : ""}">${w}</span>`).join("")}</div>
     <div class="cal-grid" id="calGrid"></div>
     <div class="cal-legend"><span class="holi">🇰🇷 공휴일</span><span>💕 우리 기념일</span><span>🎂 기념일</span><span>📌 일정</span><span>✅ 할 일</span></div>
-    <div class="cal-legend who-legend">${WHO.map((w) => `<span><i class="dot ${WHO_CLS[w]}"></i>${w}</span>`).join("")}<span>· 굵은 글씨 = 기념일</span></div>
+    <div class="cal-legend who-legend">${WHO.map((w) => `<span><i class="dot ${WHO_CLS[w]}"></i>${w}</span>`).join("")}<span><i class="dot anniv"></i>기념일</span></div>
     <div class="cal-day" id="calDay"></div>
     <form class="ev-form" id="evForm">
       <div class="ev-form-title" id="evFormTitle">＋ 기념일 · 일정 추가</div>
